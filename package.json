@@ -4,5 +4,20 @@
   "workspaces": [
     "packages/*",
     "apps/*"
-  ]
+  ],
+  "scripts": {
+    "test": "jest",
+    "test:shared": "jest --selectProjects shared",
+    "test:api": "jest --selectProjects api",
+    "test:ui": "jest --selectProjects ui",
+    "test:monitoring": "jest --selectProjects monitoring"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "@types/jest": "^29.5.0",
+    "@testing-library/react-native": "^12.4.0",
+    "@testing-library/jest-native": "^5.4.0",
+    "react-test-renderer": "^18.2.0"
+  }
 }
