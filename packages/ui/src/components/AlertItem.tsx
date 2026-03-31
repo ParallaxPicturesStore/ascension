@@ -50,9 +50,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accentLight,
   },
   icon: {
-    fontSize: 20,
+    fontSize: theme.fontSize.iconMd,
     marginRight: theme.spacing.md,
-    marginTop: 2,
+    marginTop: theme.spacing.xs / 2,
   },
   content: {
     flex: 1,

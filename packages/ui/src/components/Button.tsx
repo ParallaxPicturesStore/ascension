@@ -70,13 +70,13 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.medium,
   },
   primaryText: {
-    color: '#ffffff',
+    color: theme.colors.onAccent,
   },
   secondaryText: {
     color: theme.colors.accent,
   },
   dangerText: {
-    color: '#ffffff',
+    color: theme.colors.onAccent,
   },
   ghostText: {
     color: theme.colors.accent,

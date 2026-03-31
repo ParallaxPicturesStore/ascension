@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.cardBorder,
   },
   actionIcon: {
-    fontSize: 22,
+    fontSize: theme.fontSize.iconLg,
     marginBottom: theme.spacing.xs,
   },
   actionLabel: {
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
   },
   filterTextActive: {
-    color: '#ffffff',
+    color: theme.colors.onAccent,
   },
   feedItem: {
     marginBottom: theme.spacing.md,
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing['2xl'],
   },
   emptyIcon: {
-    fontSize: 48,
+    fontSize: theme.fontSize.iconXl,
     marginBottom: theme.spacing.base,
   },
   emptyTitle: {

@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.caption,
     color: theme.colors.muted,
-    marginTop: 2,
+    marginTop: theme.spacing.xs / 2,
   },
   sectionSpacing: {
     marginTop: theme.spacing.lg,
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.caption,
     color: theme.colors.muted,
-    marginTop: 2,
+    marginTop: theme.spacing.xs / 2,
   },
   divider: {
     height: 1,

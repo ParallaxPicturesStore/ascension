@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing['2xl'],
   },
   emptyIcon: {
-    fontSize: 48,
+    fontSize: theme.fontSize.iconXl,
     marginBottom: theme.spacing.base,
   },
   emptyTitle: {

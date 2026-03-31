@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { StyleSheet, View, ScrollView, Text, type ViewStyle } from 'react-native';
+import { StyleSheet, View, ScrollView, Text, type ViewStyle, type RefreshControlProps } from 'react-native';
 import { theme } from '../theme';
 
 export interface ScreenLayoutProps {
@@ -7,9 +7,10 @@ export interface ScreenLayoutProps {
   children: ReactNode;
   scrollable?: boolean;
   style?: ViewStyle;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
-export function ScreenLayout({ title, children, scrollable = true, style }: ScreenLayoutProps) {
+export function ScreenLayout({ title, children, scrollable = true, style, refreshControl }: ScreenLayoutProps) {
   const content = (
     <View style={[styles.inner, style]}>
       {title && <Text style={styles.title}>{title}</Text>}
@@ -23,6 +24,7 @@ export function ScreenLayout({ title, children, scrollable = true, style }: Scre
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
       >
         {content}
       </ScrollView>

@@ -26,6 +26,10 @@ All tokens live in `@ascension/ui` and must be imported from there. Never hardco
 | `success` | `#16a34a` | Positive states (clean, streak active) |
 | `warning` | `#d97706` | Caution states (flagged, evasion) |
 | `danger` | `#dc2626` | Critical states (alert, relapse) |
+| `successLight` | `#f0fdf4` | Success background tint |
+| `warningLight` | `#fffbeb` | Warning background tint |
+| `dangerLight` | `#fef2f2` | Danger background tint |
+| `onAccent` | `#ffffff` | Text on accent/dark backgrounds |
 
 ### Spacing Scale
 
@@ -50,6 +54,11 @@ All tokens live in `@ascension/ui` and must be imported from there. Never hardco
 | `h3` | 20px | Section headings |
 | `h2` | 24px | Card headings |
 | `h1` | 32px | Screen titles |
+| `display` | 64px | Large feature numbers (streak counter) |
+| `iconSm` | 18px | Small icons |
+| `iconMd` | 20px | Medium icons |
+| `iconLg` | 22px | Large icons |
+| `iconXl` | 48px | Extra large icons (empty states) |
 
 Font: **DM Sans** (regular 400, medium 500, bold 700)
 

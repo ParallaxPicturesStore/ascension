@@ -134,9 +134,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.base,
   },
   infoIcon: {
-    fontSize: 20,
+    fontSize: theme.fontSize.iconMd,
     marginRight: theme.spacing.md,
-    marginTop: 2,
+    marginTop: theme.spacing.xs / 2,
   },
   infoText: {
     flex: 1,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, RefreshControl } from 'react-native';
+import { StyleSheet, View, Text, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ScreenLayout,
@@ -26,11 +26,13 @@ export default function DashboardScreen() {
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
 
     try {
+      setError(null);
       const [streakData, alertsData, statsData, weeklyData] = await Promise.all([
         api.streaks.get(user.id),
         api.alerts.getForUser(user.id),
@@ -43,7 +45,7 @@ export default function DashboardScreen() {
       setStats(statsData);
       setWeeklyStats(weeklyData);
     } catch {
-      // Silently handle - data will show empty states
+      setError('Unable to load your data. Pull down to try again.');
     } finally {
       setLoading(false);
     }
@@ -61,11 +63,44 @@ export default function DashboardScreen() {
 
   const monitoringActive = true; // Desktop is responsible for monitoring
 
+  if (loading) {
+    return (
+      <ScreenLayout title="Dashboard" scrollable={false}>
+        <View style={styles.centeredState}>
+          <ActivityIndicator size="large" color={theme.colors.accent} />
+        </View>
+      </ScreenLayout>
+    );
+  }
+
+  if (error && !streak && !stats) {
+    return (
+      <ScreenLayout title="Dashboard" scrollable={false}>
+        <View style={styles.centeredState}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Button
+            title="Try Again"
+            variant="secondary"
+            onPress={loadData}
+            style={styles.retryButton}
+          />
+        </View>
+      </ScreenLayout>
+    );
+  }
+
   return (
     <ScreenLayout
       title="Dashboard"
       scrollable
       style={styles.screen}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={theme.colors.accent}
+        />
+      }
     >
       {/* Monitoring status */}
       <View style={styles.statusRow}>
@@ -218,5 +253,22 @@ const styles = StyleSheet.create({
   },
   bottomActions: {
     marginTop: theme.spacing.xl,
+  },
+  centeredState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+  },
+  errorText: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.muted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: theme.spacing.base,
+  },
+  retryButton: {
+    marginTop: theme.spacing.sm,
   },
 });

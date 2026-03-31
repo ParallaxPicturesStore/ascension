@@ -18,9 +18,9 @@ const DOT_COLORS: Record<BadgeVariant, string> = {
 };
 
 const BG_COLORS: Record<BadgeVariant, string> = {
-  success: '#f0fdf4',
-  warning: '#fffbeb',
-  danger: '#fef2f2',
+  success: theme.colors.successLight,
+  warning: theme.colors.warningLight,
+  danger: theme.colors.dangerLight,
   neutral: theme.colors.warmBg,
 };
 

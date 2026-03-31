@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   successCard: {
     marginBottom: theme.spacing.base,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: theme.colors.successLight,
     borderColor: theme.colors.success,
   },
   successText: {

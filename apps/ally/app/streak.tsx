@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
   },
   milestoneIcon: {
-    fontSize: 18,
+    fontSize: theme.fontSize.iconSm,
     marginRight: theme.spacing.md,
   },
   milestoneText: {

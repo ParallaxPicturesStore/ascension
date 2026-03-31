@@ -176,8 +176,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
   },
   checkmark: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: theme.colors.onAccent,
+    fontSize: theme.fontSize.caption,
     fontWeight: theme.fontWeight.bold,
   },
   goalText: {

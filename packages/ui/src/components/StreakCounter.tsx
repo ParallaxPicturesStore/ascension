@@ -29,10 +29,10 @@ const styles = StyleSheet.create({
   },
   number: {
     fontFamily: theme.fontFamily,
-    fontSize: 64,
+    fontSize: theme.fontSize.display,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.accent,
-    lineHeight: 72,
+    lineHeight: theme.fontSize.display + 8,
   },
   label: {
     fontFamily: theme.fontFamily,
