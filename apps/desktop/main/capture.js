@@ -216,23 +216,27 @@ async function pauseCapture() {
   captureState = "paused";
   console.log("[Capture] Engine paused - sending evasion alert");
 
-  // Send evasion alert
-  const user = await getCurrentUser();
-  const db = getSupabase();
+  try {
+    // Send evasion alert
+    const user = await getCurrentUser();
+    const db = getSupabase();
 
-  if (db && user && user.partner_id) {
-    await db.from("alerts").insert({
-      user_id: user.id,
-      partner_id: user.partner_id,
-      type: "evasion",
-      message: "Monitoring was paused by the user.",
-    });
-  }
+    if (db && user && user.partner_id) {
+      await db.from("alerts").insert({
+        user_id: user.id,
+        partner_id: user.partner_id,
+        type: "evasion",
+        message: "Monitoring was paused by the user.",
+      });
+    }
 
-  if (user?.partner_email) {
-    await sendAlertEmail("evasion", user.partner_email, user.name, {
-      action: "paused",
-    });
+    if (user?.partner_email) {
+      await sendAlertEmail("evasion", user.partner_email, user.name, {
+        action: "paused",
+      });
+    }
+  } catch (err) {
+    console.error("[Capture] Failed to send pause evasion alert:", err.message);
   }
 
   if (mainWindowRef) {

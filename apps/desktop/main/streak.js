@@ -134,17 +134,17 @@ async function getWeeklyStats(userId) {
   const [screenshots, blocked, alerts] = await Promise.all([
     getSupabase()
       .from("screenshots")
-      .select("id", { count: "exact" })
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("timestamp", weekAgo.toISOString()),
     getSupabase()
       .from("blocked_attempts")
-      .select("id", { count: "exact" })
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("timestamp", weekAgo.toISOString()),
     getSupabase()
       .from("screenshots")
-      .select("id", { count: "exact" })
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("flagged", true)
       .gte("timestamp", weekAgo.toISOString()),

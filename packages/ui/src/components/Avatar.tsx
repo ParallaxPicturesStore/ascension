@@ -23,17 +23,24 @@ export function Avatar({ name, source, size = 40, style }: AvatarProps) {
     borderRadius: size / 2,
   };
 
+  const a11yLabel = name ? `Avatar for ${name}` : 'User avatar';
+
   if (source) {
     return (
       <Image
         source={source}
         style={[styles.image, containerSize, style]}
+        accessibilityLabel={a11yLabel}
       />
     );
   }
 
   return (
-    <View style={[styles.fallback, containerSize, style]}>
+    <View
+      style={[styles.fallback, containerSize, style]}
+      accessibilityRole="image"
+      accessibilityLabel={a11yLabel}
+    >
       <Text style={[styles.initials, { fontSize: size * 0.4 }]}>
         {getInitials(name)}
       </Text>

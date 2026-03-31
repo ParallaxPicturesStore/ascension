@@ -279,7 +279,7 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
     async getRecent(userId, limit = 20) {
       const { data, error } = await supabase
         .from('screenshots')
-        .select('id, timestamp, flagged, rekognition_score, labels, file_path')
+        .select('*')
         .eq('user_id', userId)
         .order('timestamp', { ascending: false })
         .limit(limit);
@@ -288,24 +288,28 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
     },
 
     async getStats(userId) {
-      const [totalResult, flaggedResult] = await Promise.all([
+      const [totalResult, flaggedCountResult, lastCaptureResult] = await Promise.all([
         supabase
           .from('screenshots')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId),
         supabase
           .from('screenshots')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('flagged', true),
+        supabase
+          .from('screenshots')
           .select('timestamp')
           .eq('user_id', userId)
-          .eq('flagged', true)
           .order('timestamp', { ascending: false })
           .limit(1),
       ]);
 
       return {
         totalCaptures: totalResult.count ?? 0,
-        flaggedCount: flaggedResult.data?.length ?? 0,
-        lastCaptureTime: flaggedResult.data?.[0]?.timestamp ?? null,
+        flaggedCount: flaggedCountResult.count ?? 0,
+        lastCaptureTime: lastCaptureResult.data?.[0]?.timestamp ?? null,
       };
     },
   };

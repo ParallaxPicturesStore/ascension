@@ -87,7 +87,7 @@ type ActionHandler = (
 
 const actions: Record<string, ActionHandler> = {
   // ── screenshots.log ──
-  "screenshots.log": async (payload, _callerId) => {
+  "screenshots.log": async (payload, callerId) => {
     const { user_id, timestamp, rekognition_score, flagged, labels } = payload as {
       user_id: string;
       timestamp: string;
@@ -95,6 +95,13 @@ const actions: Record<string, ActionHandler> = {
       flagged: boolean;
       labels: string[] | null;
     };
+
+    if (!user_id) return errorResponse("user_id is required", 400);
+
+    // Callers can only log screenshots for themselves
+    if (user_id !== callerId) {
+      return errorResponse("Cannot log screenshots for another user", 403);
+    }
 
     const { error } = await adminDb.from("screenshots").insert({
       user_id,
@@ -109,13 +116,22 @@ const actions: Record<string, ActionHandler> = {
   },
 
   // ── alerts.create ──
-  "alerts.create": async (payload, _callerId) => {
+  "alerts.create": async (payload, callerId) => {
     const { user_id, partner_id, type, message } = payload as {
       user_id: string;
       partner_id: string;
       type: string;
       message: string;
     };
+
+    if (!user_id || !partner_id || !type || !message) {
+      return errorResponse("user_id, partner_id, type, and message are required", 400);
+    }
+
+    // Callers can only create alerts for themselves
+    if (user_id !== callerId) {
+      return errorResponse("Cannot create alerts for another user", 403);
+    }
 
     const { error } = await adminDb.from("alerts").insert({
       user_id,
@@ -129,8 +145,11 @@ const actions: Record<string, ActionHandler> = {
   },
 
   // ── streaks.reset ──
-  "streaks.reset": async (payload, _callerId) => {
+  "streaks.reset": async (payload, callerId) => {
     const { user_id } = payload as { user_id: string };
+
+    if (!user_id) return errorResponse("user_id is required", 400);
+    if (user_id !== callerId) return errorResponse("Cannot reset another user's streak", 403);
 
     // Read current streak
     const { data: current, error: readErr } = await adminDb
@@ -139,7 +158,8 @@ const actions: Record<string, ActionHandler> = {
       .eq("user_id", user_id)
       .single();
 
-    if (readErr) return errorResponse(readErr.message, 500);
+    if (readErr && readErr.code !== "PGRST116") return errorResponse(readErr.message, 500);
+    if (!current) return errorResponse("No streak record found", 404);
 
     const now = new Date().toISOString();
     const longestStreak = Math.max(
@@ -164,8 +184,11 @@ const actions: Record<string, ActionHandler> = {
   },
 
   // ── streaks.increment ──
-  "streaks.increment": async (payload, _callerId) => {
+  "streaks.increment": async (payload, callerId) => {
     const { user_id } = payload as { user_id: string };
+
+    if (!user_id) return errorResponse("user_id is required", 400);
+    if (user_id !== callerId) return errorResponse("Cannot modify another user's streak", 403);
 
     const { data: current, error: readErr } = await adminDb
       .from("streaks")

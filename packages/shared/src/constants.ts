@@ -44,9 +44,8 @@ export enum AlertType {
 // --- Subscription statuses ---
 
 export enum SubscriptionStatus {
+  Trial = 'trial',
   Active = 'active',
-  Trialing = 'trialing',
   Cancelled = 'cancelled',
   Expired = 'expired',
-  PastDue = 'past_due',
 }

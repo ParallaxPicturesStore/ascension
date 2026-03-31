@@ -10,7 +10,11 @@ export interface Database {
           partner_email: string | null;
           stripe_customer_id: string | null;
           subscription_status: string;
+          subscription_lapse_date: string | null;
           goals: string | null;
+          partner_password_hash: string | null;
+          app_disabled: boolean | null;
+          lapse_reminders_sent: string[] | null;
           created_at: string;
         };
         Insert: {
@@ -21,7 +25,11 @@ export interface Database {
           partner_email?: string | null;
           stripe_customer_id?: string | null;
           subscription_status?: string;
+          subscription_lapse_date?: string | null;
           goals?: string | null;
+          partner_password_hash?: string | null;
+          app_disabled?: boolean | null;
+          lapse_reminders_sent?: string[] | null;
         };
         Update: {
           id?: string;
@@ -31,7 +39,11 @@ export interface Database {
           partner_email?: string | null;
           stripe_customer_id?: string | null;
           subscription_status?: string;
+          subscription_lapse_date?: string | null;
           goals?: string | null;
+          partner_password_hash?: string | null;
+          app_disabled?: boolean | null;
+          lapse_reminders_sent?: string[] | null;
         };
       };
       screenshots: {
@@ -114,6 +126,7 @@ export interface Database {
           current_streak: number;
           longest_streak: number;
           last_relapse_date: string | null;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -126,6 +139,7 @@ export interface Database {
           current_streak?: number;
           longest_streak?: number;
           last_relapse_date?: string | null;
+          updated_at?: string;
         };
       };
     };

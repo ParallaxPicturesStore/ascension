@@ -10,7 +10,11 @@ export interface StreakCounterProps {
 
 export function StreakCounter({ currentStreak, longestStreak, style }: StreakCounterProps) {
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[styles.container, style]}
+      accessibilityRole="text"
+      accessibilityLabel={`Current streak: ${currentStreak} ${currentStreak === 1 ? 'day' : 'days'}. Longest streak: ${longestStreak} ${longestStreak === 1 ? 'day' : 'days'}.`}
+    >
       <Text style={styles.number}>{currentStreak}</Text>
       <Text style={styles.label}>{currentStreak === 1 ? 'day' : 'days'}</Text>
       <Text style={styles.longest}>Longest: {longestStreak} {longestStreak === 1 ? 'day' : 'days'}</Text>

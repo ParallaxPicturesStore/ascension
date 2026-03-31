@@ -191,17 +191,14 @@ export async function analyzeImage(base64: string): Promise<AnalysisResult> {
     }
   }
 
-  // If no NSFW category scored above zero, use neutral
-  if (topScore === 0) {
-    topCategory = 'neutral';
-    topScore = scores.neutral;
-  }
+  // If no NSFW category scored above zero, content is clean
+  const isNSFW = topScore > 0 && topCategory !== 'neutral';
 
   return {
     scores,
     topCategory,
-    topScore,
-    flagged: topScore >= LOCAL_FLAG_THRESHOLD,
-    alert: topScore >= ALERT_THRESHOLD,
+    topScore: isNSFW ? topScore : 0,
+    flagged: isNSFW && topScore >= LOCAL_FLAG_THRESHOLD,
+    alert: isNSFW && topScore >= ALERT_THRESHOLD,
   };
 }

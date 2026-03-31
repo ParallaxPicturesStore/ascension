@@ -21,6 +21,7 @@ export function BlurredImage({ source, blurRadius = 25, aspectRatio = 16 / 9, st
         style={styles.image}
         blurRadius={blurRadius}
         resizeMode="cover"
+        accessibilityLabel="Blurred screenshot"
       />
     </View>
   );

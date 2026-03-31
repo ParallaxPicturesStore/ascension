@@ -24,6 +24,8 @@ export function Input({ label, error, style, ...textInputProps }: InputProps) {
         {...textInputProps}
         style={[styles.input, { borderColor: inputBorderColor }]}
         placeholderTextColor={theme.colors.muted}
+        accessibilityLabel={label ?? textInputProps.placeholder}
+        accessibilityState={{ disabled: textInputProps.editable === false }}
         onFocus={(e) => {
           setFocused(true);
           textInputProps.onFocus?.(e);
