@@ -19,6 +19,10 @@
       "adaptiveIcon": { "backgroundColor": "#faf9f7" },
       "package": "app.getascension.mobile"
     },
-    "plugins": ["expo-router", "./plugins/withScreenCapture"]
+    "plugins": [
+      "expo-router",
+      "./plugins/withScreenCapture",
+      "./plugins/withVPNExtension"
+    ]
   }
 }
