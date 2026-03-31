@@ -1,0 +1,81 @@
+{
+  "name": "ascension-desktop",
+  "version": "0.1.0",
+  "description": "Screen accountability for men.",
+  "author": "Ascension <hello@getascension.app>",
+  "private": true,
+  "main": "main/main.js",
+  "scripts": {
+    "dev:next": "next dev --port 3001",
+    "dev:electron": "wait-on http://localhost:3001 && env -u ELECTRON_RUN_AS_NODE electron .",
+    "dev": "concurrently -n next,electron \"npm run dev:next\" \"npm run dev:electron\"",
+    "build:next": "next build",
+    "build:electron": "electron-builder",
+    "build": "npm run build:next && npm run build:electron",
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "generate-icons": "node scripts/generate-icons.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.700.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "nsfwjs": "^4.1.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "auto-launch": "^5.0.6",
+    "electron-store": "^10.0.0",
+    "lucide-react": "^0.469.0",
+    "next": "^16.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "resend": "^6.9.4",
+    "screenshot-desktop": "^1.15.0",
+    "sharp": "^0.33.0",
+    "stripe": "^21.0.1",
+    "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "concurrently": "^9.1.0",
+    "electron": "^32.3.3",
+    "electron-builder": "^25.1.0",
+    "pg": "^8.20.0",
+    "png-to-ico": "^2.1.8",
+    "typescript": "^5.7.0",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "app.getascension.desktop",
+    "productName": "Ascension",
+    "asar": false,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main/**/*",
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "include": "build/installer.nsh",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ascension"
+    }
+  }
+}

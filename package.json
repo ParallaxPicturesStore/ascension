@@ -1,0 +1,8 @@
+{
+  "name": "ascension",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}
