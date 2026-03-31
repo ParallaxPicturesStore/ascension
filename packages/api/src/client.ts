@@ -1,14 +1,597 @@
-// TODO: API client scaffold - the API agent will implement this.
-// This will wrap Supabase calls behind a clean interface so that
-// mobile and ally apps don't import Supabase directly.
-//
-// Expected exports:
-// - createApiClient(config)
-// - auth methods (signIn, signUp, signOut, getSession)
-// - streak methods (getStreak, resetStreak)
-// - alert methods (getAlerts, markRead)
-// - screenshot methods (getRecent, getStats)
-// - partner methods (invite, link, getPartnerData)
-// - subscription methods (getStatus, createCheckout)
+// ============================================================
+// Ascension API Client
+// Platform-agnostic typed wrapper around Supabase + Edge Functions.
+// Uses ANON key only — elevated operations go through Edge Functions.
+// ============================================================
 
-export {};
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type {
+  AscensionApiConfig,
+  AuthResult,
+  Session,
+  UserProfile,
+  PartnerData,
+  Screenshot,
+  ScreenshotLog,
+  ScreenshotStats,
+  Alert,
+  CreateAlert,
+  AlertType,
+  BlockedAttempt,
+  Streak,
+  WeeklyStats,
+  SubscriptionStatus,
+  CheckoutResult,
+  Device,
+  RegisterDevice,
+  Encouragement,
+  CreateEncouragement,
+} from './types';
+
+// ── Helper: throw on Supabase error ─────────────────────────
+
+function throwOnError<T>(result: { data: T; error: { message: string } | null }): T {
+  if (result.error) throw new Error(result.error.message);
+  return result.data;
+}
+
+// ── API Client Interface ────────────────────────────────────
+
+export interface AscensionAPI {
+  /** Access the raw Supabase client (e.g. for realtime subscriptions). */
+  readonly supabase: SupabaseClient;
+
+  auth: {
+    signUp(email: string, password: string): Promise<AuthResult>;
+    signIn(email: string, password: string): Promise<AuthResult>;
+    signOut(): Promise<void>;
+    getSession(): Promise<Session | null>;
+    onAuthStateChange(callback: (event: string, session: Session | null) => void): {
+      unsubscribe: () => void;
+    };
+  };
+
+  users: {
+    getProfile(userId: string): Promise<UserProfile>;
+    updateProfile(userId: string, data: Partial<UserProfile>): Promise<void>;
+    getPartnerData(userId: string): Promise<PartnerData | null>;
+    setQuitPassword(userId: string, passwordHash: string): Promise<void>;
+    getQuitPasswordHash(userId: string): Promise<string | null>;
+  };
+
+  screenshots: {
+    log(data: ScreenshotLog): Promise<void>;
+    getRecent(userId: string, limit?: number): Promise<Screenshot[]>;
+    getStats(userId: string): Promise<ScreenshotStats>;
+  };
+
+  alerts: {
+    create(data: CreateAlert): Promise<void>;
+    getForPartner(partnerId: string): Promise<Alert[]>;
+    getForUser(userId: string): Promise<Alert[]>;
+    markRead(alertId: string): Promise<void>;
+  };
+
+  streaks: {
+    get(userId: string): Promise<Streak | null>;
+    reset(userId: string): Promise<Streak>;
+    increment(userId: string): Promise<Streak>;
+    getWeeklyStats(userId: string): Promise<WeeklyStats>;
+  };
+
+  billing: {
+    createCheckout(userId: string, email: string, plan: string): Promise<CheckoutResult>;
+    getSubscriptionStatus(userId: string): Promise<SubscriptionStatus>;
+    getCustomerId(userId: string): Promise<string | null>;
+    createPortalSession(customerId: string): Promise<{ url: string } | null>;
+  };
+
+  blockedAttempts: {
+    log(data: BlockedAttempt): Promise<void>;
+    getRecent(userId: string, limit?: number): Promise<BlockedAttempt[]>;
+  };
+
+  devices: {
+    register(data: RegisterDevice): Promise<Device>;
+    heartbeat(deviceId: string): Promise<void>;
+    updatePushToken(deviceId: string, token: string): Promise<void>;
+    list(userId: string): Promise<Device[]>;
+    remove(deviceId: string): Promise<void>;
+  };
+
+  encouragements: {
+    send(data: CreateEncouragement): Promise<Encouragement>;
+    getForUser(userId: string): Promise<Encouragement[]>;
+    markRead(encouragementId: string): Promise<void>;
+    getUnreadCount(userId: string): Promise<number>;
+  };
+}
+
+// ── Factory ─────────────────────────────────────────────────
+
+export function createApiClient(config: AscensionApiConfig): AscensionAPI {
+  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+  const functionsBase = config.functionsBaseUrl ?? `${config.supabaseUrl}/functions/v1`;
+
+  // Helper to call Edge Functions with the user's access token
+  async function callEdgeFunction<T = unknown>(
+    fnName: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    const res = await fetch(`${functionsBase}/${fnName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token ?? config.supabaseAnonKey}`,
+        'apikey': config.supabaseAnonKey,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Edge Function ${fnName} failed (${res.status}): ${text}`);
+    }
+
+    return res.json() as Promise<T>;
+  }
+
+  // ── Auth ────────────────────────────────────────────────────
+
+  const auth: AscensionAPI['auth'] = {
+    async signUp(email, password) {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return { user: null, session: null, error: error.message };
+      return {
+        user: data.user ? { id: data.user.id, email: data.user.email! } : null,
+        session: data.session as Session | null,
+        error: null,
+      };
+    },
+
+    async signIn(email, password) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { user: null, session: null, error: error.message };
+      return {
+        user: data.user ? { id: data.user.id, email: data.user.email! } : null,
+        session: data.session as Session | null,
+        error: null,
+      };
+    },
+
+    async signOut() {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw new Error(error.message);
+    },
+
+    async getSession() {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw new Error(error.message);
+      return (data.session as Session | null) ?? null;
+    },
+
+    onAuthStateChange(callback) {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        callback(event, session as Session | null);
+      });
+      return { unsubscribe: () => data.subscription.unsubscribe() };
+    },
+  };
+
+  // ── Users ───────────────────────────────────────────────────
+
+  const users: AscensionAPI['users'] = {
+    async getProfile(userId) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (error) throw new Error(error.message);
+      return data as UserProfile;
+    },
+
+    async updateProfile(userId, updates) {
+      throwOnError(
+        await supabase.from('users').update(updates).eq('id', userId),
+      );
+    },
+
+    async getPartnerData(userId) {
+      // Get the user's partner_id first
+      const { data: user } = await supabase
+        .from('users')
+        .select('partner_id')
+        .eq('id', userId)
+        .single();
+
+      if (!user?.partner_id) return null;
+
+      // Fetch partner profile (RLS allows partner reads)
+      const { data: partner } = await supabase
+        .from('users')
+        .select('id, name, email, subscription_status')
+        .eq('id', user.partner_id)
+        .single();
+
+      if (!partner) return null;
+
+      // Fetch partner's streak
+      const { data: streak } = await supabase
+        .from('streaks')
+        .select('*')
+        .eq('user_id', user.partner_id)
+        .single();
+
+      // Fetch recent alerts for this partner
+      const { data: recentAlerts } = await supabase
+        .from('alerts')
+        .select('*')
+        .eq('partner_id', userId)
+        .order('timestamp', { ascending: false })
+        .limit(10);
+
+      return {
+        id: partner.id,
+        name: partner.name,
+        email: partner.email,
+        subscription_status: partner.subscription_status as SubscriptionStatus,
+        streak: (streak as Streak) ?? null,
+        recentAlerts: (recentAlerts as Alert[]) ?? [],
+      };
+    },
+
+    async setQuitPassword(userId, passwordHash) {
+      throwOnError(
+        await supabase
+          .from('users')
+          .update({ partner_password_hash: passwordHash })
+          .eq('id', userId),
+      );
+    },
+
+    async getQuitPasswordHash(userId) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('partner_password_hash')
+        .eq('id', userId)
+        .single();
+      if (error) throw new Error(error.message);
+      return data?.partner_password_hash ?? null;
+    },
+  };
+
+  // ── Screenshots ─────────────────────────────────────────────
+
+  const screenshots: AscensionAPI['screenshots'] = {
+    async log(data) {
+      // Uses Edge Function because desktop/mobile may not have RLS insert
+      // permission in all contexts (service role was previously used).
+      await callEdgeFunction('ascension-api', {
+        action: 'screenshots.log',
+        payload: data,
+      });
+    },
+
+    async getRecent(userId, limit = 20) {
+      const { data, error } = await supabase
+        .from('screenshots')
+        .select('id, timestamp, flagged, rekognition_score, labels, file_path')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Screenshot[];
+    },
+
+    async getStats(userId) {
+      const [totalResult, flaggedResult] = await Promise.all([
+        supabase
+          .from('screenshots')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId),
+        supabase
+          .from('screenshots')
+          .select('timestamp')
+          .eq('user_id', userId)
+          .eq('flagged', true)
+          .order('timestamp', { ascending: false })
+          .limit(1),
+      ]);
+
+      return {
+        totalCaptures: totalResult.count ?? 0,
+        flaggedCount: flaggedResult.data?.length ?? 0,
+        lastCaptureTime: flaggedResult.data?.[0]?.timestamp ?? null,
+      };
+    },
+  };
+
+  // ── Alerts ──────────────────────────────────────────────────
+
+  const alerts: AscensionAPI['alerts'] = {
+    async create(data) {
+      // Edge Function for service-role insert
+      await callEdgeFunction('ascension-api', {
+        action: 'alerts.create',
+        payload: data,
+      });
+    },
+
+    async getForPartner(partnerId) {
+      const { data, error } = await supabase
+        .from('alerts')
+        .select('*')
+        .eq('partner_id', partnerId)
+        .order('timestamp', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Alert[];
+    },
+
+    async getForUser(userId) {
+      const { data, error } = await supabase
+        .from('alerts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Alert[];
+    },
+
+    async markRead(alertId) {
+      throwOnError(
+        await supabase.from('alerts').update({ read: true }).eq('id', alertId),
+      );
+    },
+  };
+
+  // ── Streaks ─────────────────────────────────────────────────
+
+  const streaks: AscensionAPI['streaks'] = {
+    async get(userId) {
+      const { data, error } = await supabase
+        .from('streaks')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      if (error) {
+        // No row yet is not an error
+        if (error.code === 'PGRST116') return null;
+        throw new Error(error.message);
+      }
+      return data as Streak;
+    },
+
+    async reset(userId) {
+      const result = await callEdgeFunction<Streak>('ascension-api', {
+        action: 'streaks.reset',
+        payload: { user_id: userId },
+      });
+      return result;
+    },
+
+    async increment(userId) {
+      const result = await callEdgeFunction<Streak>('ascension-api', {
+        action: 'streaks.increment',
+        payload: { user_id: userId },
+      });
+      return result;
+    },
+
+    async getWeeklyStats(userId) {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const since = weekAgo.toISOString();
+
+      const [screenshotResult, blockedResult, flaggedResult] = await Promise.all([
+        supabase
+          .from('screenshots')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('timestamp', since),
+        supabase
+          .from('blocked_attempts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('timestamp', since),
+        supabase
+          .from('screenshots')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('flagged', true)
+          .gte('timestamp', since),
+      ]);
+
+      return {
+        screenshotCount: screenshotResult.count ?? 0,
+        blockedCount: blockedResult.count ?? 0,
+        flaggedCount: flaggedResult.count ?? 0,
+      };
+    },
+  };
+
+  // ── Billing ─────────────────────────────────────────────────
+
+  const billing: AscensionAPI['billing'] = {
+    async createCheckout(userId, email, plan) {
+      return callEdgeFunction<CheckoutResult>('ascension-api', {
+        action: 'billing.createCheckout',
+        payload: { user_id: userId, email, plan },
+      });
+    },
+
+    async getSubscriptionStatus(userId) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('subscription_status')
+        .eq('id', userId)
+        .single();
+      if (error) throw new Error(error.message);
+      return (data?.subscription_status as SubscriptionStatus) ?? 'trial';
+    },
+
+    async getCustomerId(userId) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('stripe_customer_id')
+        .eq('id', userId)
+        .single();
+      if (error) throw new Error(error.message);
+      return data?.stripe_customer_id ?? null;
+    },
+
+    async createPortalSession(customerId) {
+      return callEdgeFunction<{ url: string } | null>('ascension-api', {
+        action: 'billing.createPortalSession',
+        payload: { customer_id: customerId },
+      });
+    },
+  };
+
+  // ── Blocked Attempts ────────────────────────────────────────
+
+  const blockedAttempts: AscensionAPI['blockedAttempts'] = {
+    async log(data) {
+      throwOnError(
+        await supabase.from('blocked_attempts').insert({
+          user_id: data.user_id,
+          url: data.url,
+          browser: data.browser,
+          blocked_successfully: data.blocked_successfully,
+        }),
+      );
+    },
+
+    async getRecent(userId, limit = 20) {
+      const { data, error } = await supabase
+        .from('blocked_attempts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as BlockedAttempt[];
+    },
+  };
+
+  // ── Devices ─────────────────────────────────────────────────
+
+  const devices: AscensionAPI['devices'] = {
+    async register(data) {
+      const { data: device, error } = await supabase
+        .from('devices')
+        .upsert(
+          {
+            user_id: data.user_id,
+            platform: data.platform,
+            device_name: data.device_name ?? null,
+            push_token: data.push_token ?? null,
+            app_version: data.app_version ?? null,
+            last_heartbeat: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,platform,device_name' },
+        )
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return device as Device;
+    },
+
+    async heartbeat(deviceId) {
+      throwOnError(
+        await supabase
+          .from('devices')
+          .update({ last_heartbeat: new Date().toISOString() })
+          .eq('id', deviceId),
+      );
+    },
+
+    async updatePushToken(deviceId, token) {
+      throwOnError(
+        await supabase
+          .from('devices')
+          .update({ push_token: token })
+          .eq('id', deviceId),
+      );
+    },
+
+    async list(userId) {
+      const { data, error } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('user_id', userId)
+        .order('last_heartbeat', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Device[];
+    },
+
+    async remove(deviceId) {
+      throwOnError(await supabase.from('devices').delete().eq('id', deviceId));
+    },
+  };
+
+  // ── Encouragements ─────────────────────────────────────────
+
+  const encouragements: AscensionAPI['encouragements'] = {
+    async send(data) {
+      const { data: row, error } = await supabase
+        .from('encouragements')
+        .insert({
+          from_user_id: data.from_user_id,
+          to_user_id: data.to_user_id,
+          message: data.message,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return row as Encouragement;
+    },
+
+    async getForUser(userId) {
+      const { data, error } = await supabase
+        .from('encouragements')
+        .select('*')
+        .eq('to_user_id', userId)
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Encouragement[];
+    },
+
+    async markRead(encouragementId) {
+      throwOnError(
+        await supabase
+          .from('encouragements')
+          .update({ read: true })
+          .eq('id', encouragementId),
+      );
+    },
+
+    async getUnreadCount(userId) {
+      const { count, error } = await supabase
+        .from('encouragements')
+        .select('id', { count: 'exact', head: true })
+        .eq('to_user_id', userId)
+        .eq('read', false);
+      if (error) throw new Error(error.message);
+      return count ?? 0;
+    },
+  };
+
+  // ── Return ──────────────────────────────────────────────────
+
+  return {
+    supabase,
+    auth,
+    users,
+    screenshots,
+    alerts,
+    streaks,
+    billing,
+    blockedAttempts,
+    devices,
+    encouragements,
+  };
+}
