@@ -10,8 +10,8 @@ import {
   Badge,
   theme,
 } from '@ascension/ui';
-import type { UserProfile, SubscriptionStatus } from '@ascension/api';
-import { useApi } from '@ascension/api';
+import type { UserProfile, SubscriptionStatus } from '../src/hooks/useApi';
+import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 
 const STATUS_BADGE_MAP: Record<string, { text: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }> = {

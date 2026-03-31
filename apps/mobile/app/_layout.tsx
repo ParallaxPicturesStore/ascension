@@ -1,11 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { theme } from '@ascension/ui';
-import { ApiProvider, useApi } from '@ascension/api';
+import { createApiClient } from '@ascension/api';
+import type { AscensionAPI } from '@ascension/api';
 import { useAuth } from '../src/hooks/useAuth';
 import { config } from '../src/config';
+
+// Inline ApiProvider to avoid React dual-instance issue in monorepo
+const ApiContext = createContext<AscensionAPI | null>(null);
+export function useApi(): AscensionAPI {
+  const api = useContext(ApiContext);
+  if (!api) throw new Error('useApi must be used within ApiProvider');
+  return api;
+}
 
 function AuthGate() {
   const api = useApi();
@@ -77,8 +86,8 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
-  const apiConfig = useMemo(
-    () => ({
+  const api = useMemo(
+    () => createApiClient({
       supabaseUrl: config.supabaseUrl,
       supabaseAnonKey: config.supabaseAnonKey,
     }),
@@ -86,10 +95,10 @@ export default function RootLayout() {
   );
 
   return (
-    <ApiProvider config={apiConfig}>
+    <ApiContext.Provider value={api}>
       <StatusBar style="dark" />
       <AuthGate />
-    </ApiProvider>
+    </ApiContext.Provider>
   );
 }
 

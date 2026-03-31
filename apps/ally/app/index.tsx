@@ -20,7 +20,7 @@ import {
 import { formatRelativeTime } from '@ascension/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
-import { useApi } from '@ascension/api';
+import { useApi } from '../src/hooks/useApi';
 import type { Screenshot } from '@ascension/api';
 
 type FilterMode = 'all' | 'flagged';

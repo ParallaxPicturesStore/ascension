@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useApi } from '@ascension/api';
+import { useApi } from './useApi';
 import type { PartnerData, Alert, Streak, WeeklyStats } from '@ascension/api';
 
 interface PartnerState {

@@ -11,8 +11,8 @@ import {
   Button,
   theme,
 } from '@ascension/ui';
-import type { Alert, Streak, ScreenshotStats, WeeklyStats } from '@ascension/api';
-import { useApi } from '@ascension/api';
+import type { Alert, Streak, ScreenshotStats, WeeklyStats } from '../src/hooks/useApi';
+import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 
 export default function DashboardScreen() {

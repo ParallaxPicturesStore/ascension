@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenLayout, Button, Card, Badge, theme } from '@ascension/ui';
-import type { UserProfile } from '@ascension/api';
-import { useApi } from '@ascension/api';
+import type { UserProfile } from '../../src/hooks/useApi';
+import { useApi } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/hooks/useAuth';
 
 export default function OnboardingConfirmScreen() {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useApi } from '@ascension/api';
+import { useApi } from './useApi';
 import type { Session } from '@ascension/api';
 
 interface AuthState {

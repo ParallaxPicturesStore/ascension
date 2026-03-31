@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Linking, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenLayout, Card, Button, Badge, theme } from '@ascension/ui';
-import { useApi } from '@ascension/api';
+import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 
 type PlanType = 'monthly' | 'annual';

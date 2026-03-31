@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl } fr
 import { theme, ScreenLayout, AlertItem, Badge } from '@ascension/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
-import { useApi } from '@ascension/api';
+import { useApi } from '../src/hooks/useApi';
 import type { Alert as AlertData } from '@ascension/api';
 
 export default function AlertsScreen() {
