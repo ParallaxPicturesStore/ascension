@@ -2,7 +2,7 @@
  * Supabase Edge Function: Ascension API
  * Handles operations that require service_role (elevated) permissions.
  *
- * URL: https://flrllorqzmbztvtccvab.supabase.co/functions/v1/ascension-api
+ * URL: {SUPABASE_URL}/functions/v1/ascension-api
  *
  * All requests are POST with JSON body:
  *   { "action": "screenshots.log", "payload": { ... } }
@@ -61,8 +61,27 @@ async function getCallerUserId(req: Request): Promise<string | null> {
 
 // ── CORS headers ────────────────────────────────────────────
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+// SECURITY: Restrict CORS to known origins. Update this list when adding new
+// client domains. The wildcard "*" was removed to prevent cross-origin abuse.
+const ALLOWED_ORIGINS = new Set([
+  "https://getascension.app",
+  "https://www.getascension.app",
+  "http://localhost:3001", // dev
+]);
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "";
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
+// Backward-compat alias used by helper functions — set per-request in handler
+let corsHeaders: Record<string, string> = {
+  "Access-Control-Allow-Origin": "",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -216,12 +235,17 @@ const actions: Record<string, ActionHandler> = {
   },
 
   // ── billing.createCheckout ──
-  "billing.createCheckout": async (payload, _callerId) => {
+  "billing.createCheckout": async (payload, callerId) => {
     const { user_id, email, plan } = payload as {
       user_id: string;
       email: string;
       plan: string;
     };
+
+    // Callers can only create checkouts for themselves
+    if (user_id !== callerId) {
+      return errorResponse("Cannot create checkout for another user", 403);
+    }
 
     const stripe = getStripe();
     if (!stripe) return errorResponse("Stripe not configured", 500);
@@ -251,11 +275,21 @@ const actions: Record<string, ActionHandler> = {
   },
 
   // ── billing.createPortalSession ──
-  "billing.createPortalSession": async (payload, _callerId) => {
+  "billing.createPortalSession": async (payload, callerId) => {
     const { customer_id } = payload as { customer_id: string };
 
     const stripe = getStripe();
     if (!stripe || !customer_id) return jsonResponse(null);
+
+    // Verify the caller owns this Stripe customer ID
+    const { data: owner } = await adminDb
+      .from("users")
+      .select("id")
+      .eq("stripe_customer_id", customer_id)
+      .single();
+    if (!owner || owner.id !== callerId) {
+      return errorResponse("Cannot access another user's billing portal", 403);
+    }
 
     try {
       const session = await stripe.billingPortal.sessions.create({
@@ -273,6 +307,9 @@ const actions: Record<string, ActionHandler> = {
 // ── Main handler ────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  // Set CORS headers per-request based on Origin
+  corsHeaders = getCorsHeaders(req);
+
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });

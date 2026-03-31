@@ -586,7 +586,11 @@ function getHostsPath() {
 function buildBlockSection(domains) {
   const lines = [MARKER_START];
   for (const domain of domains) {
-    lines.push(`0.0.0.0 ${domain}`);
+    // Sanitize: strip whitespace/newlines/comments to prevent hosts file injection
+    const clean = domain.replace(/[\s#]/g, "").toLowerCase();
+    if (clean && clean.includes(".") && /^[a-z0-9.-]+$/.test(clean)) {
+      lines.push(`0.0.0.0 ${clean}`);
+    }
   }
   lines.push(MARKER_END);
   return lines.join("\n");
@@ -616,7 +620,8 @@ function removeBlock(current) {
 function elevatedWrite(content) {
   return new Promise((resolve) => {
     const hostsPath = getHostsPath();
-    const tempFile = path.join(os.tmpdir(), "asc_hosts_tmp.txt");
+    // Use a unique temp file per invocation to prevent race conditions
+    const tempFile = path.join(os.tmpdir(), `asc_hosts_${Date.now()}_${Math.random().toString(36).slice(2)}.txt`);
 
     try {
       fs.writeFileSync(tempFile, content, "utf8");

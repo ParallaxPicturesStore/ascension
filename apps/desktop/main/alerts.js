@@ -9,6 +9,17 @@ function getResend() {
   return resend;
 }
 
+/** Escape HTML special characters to prevent XSS in email templates. */
+function escapeHtml(str) {
+  if (typeof str !== "string") return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 const TEMPLATES = {
   attempted_access: {
     subject: (name) => `${name} attempted to access blocked content`,
@@ -24,7 +35,7 @@ const TEMPLATES = {
           <p style="margin: 0; font-size: 14px; color: #6b6560;">
             The attempt was <strong style="color: #22c55e;">blocked successfully</strong>.
           </p>
-          ${data.url ? `<p style="margin: 8px 0 0; font-size: 13px; color: #94a3b8;">URL: ${data.url}</p>` : ""}
+          ${data.url ? `<p style="margin: 8px 0 0; font-size: 13px; color: #94a3b8;">URL: ${escapeHtml(data.url)}</p>` : ""}
         </div>
         <p style="font-size: 14px; color: #6b6560;">You may want to check in with ${name}.</p>
       </div>
@@ -45,7 +56,7 @@ const TEMPLATES = {
           <p style="margin: 0; font-size: 14px; color: #991b1b;">
             Confidence: <strong>${data.confidence}%</strong>
           </p>
-          ${data.labels ? `<p style="margin: 8px 0 0; font-size: 13px; color: #94a3b8;">Labels: ${data.labels}</p>` : ""}
+          ${data.labels ? `<p style="margin: 8px 0 0; font-size: 13px; color: #94a3b8;">Labels: ${escapeHtml(data.labels)}</p>` : ""}
         </div>
         <p style="font-size: 14px; color: #6b6560;">A blurred screenshot is available in your partner dashboard.</p>
       </div>

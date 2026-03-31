@@ -78,8 +78,15 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
     };
   });
 
-  // Alert emails
+  // Alert emails — validate inputs to prevent injection into email HTML
   ipcMain.handle("alert:send", async (_, { type, partnerEmail, userName, data }) => {
+    if (typeof type !== "string" || typeof partnerEmail !== "string" || typeof userName !== "string") {
+      return { error: "Invalid alert parameters" };
+    }
+    // Basic email format check
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) {
+      return { error: "Invalid email address" };
+    }
     return await sendAlertEmail(type, partnerEmail, userName, data);
   });
 
@@ -161,6 +168,11 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
 
   // Notify main process that user has logged in - starts watchdog
   ipcMain.handle("user:logged-in", (_, userId) => {
+    // Validate userId is a UUID to prevent injection
+    if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      console.warn("[IPC] Invalid userId rejected");
+      return { ok: false, error: "Invalid user ID" };
+    }
     currentUserId = userId;
     if (onUserLoggedIn) onUserLoggedIn(userId);
     return { ok: true };
@@ -168,8 +180,16 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
 
   // Set the quit password (hashed and stored in Supabase)
   ipcMain.handle("user:set-quit-password", async (_, { userId, password }) => {
-    if (!password || password.length < 4) {
+    if (typeof password !== "string" || password.length < 4) {
       return { success: false, error: "Password must be at least 4 characters" };
+    }
+    // Validate userId is a UUID
+    if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      return { success: false, error: "Invalid user ID" };
+    }
+    // Only allow setting password for the currently logged-in user
+    if (userId !== currentUserId) {
+      return { success: false, error: "Cannot set password for another user" };
     }
     const hash = hashQuitPassword(password, userId);
     const { error } = await getDb()
@@ -179,9 +199,19 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
     return { success: !error, error: error?.message };
   });
 
-  // Open external URL
+  // Open external URL — only allow http(s) to prevent arbitrary protocol execution
   ipcMain.handle("shell:open-external", (_, url) => {
-    shell.openExternal(url);
+    if (typeof url !== "string") return;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        shell.openExternal(url);
+      } else {
+        console.warn("[IPC] Blocked non-http URL:", parsed.protocol);
+      }
+    } catch (e) {
+      console.warn("[IPC] Invalid URL rejected:", url);
+    }
   });
 
   console.log("[IPC] Handlers registered");

@@ -9,7 +9,10 @@ out/
 *.dmg
 *.blockmap
 
-# Environment
+# Environment — NEVER commit files containing secrets
+.env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 

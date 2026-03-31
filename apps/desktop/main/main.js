@@ -90,6 +90,9 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      sandbox: true,
     },
   });
 
@@ -109,6 +112,27 @@ function createWindow() {
   if (isDev) {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
+
+  // SECURITY: Prevent navigation to untrusted origins
+  mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
+    const allowed = ["http://localhost:3001", "file://"];
+    if (!allowed.some((a) => navigationUrl.startsWith(a))) {
+      event.preventDefault();
+      console.warn("[Security] Blocked navigation to:", navigationUrl);
+    }
+  });
+
+  // SECURITY: Prevent new window creation (e.g. window.open)
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const { shell } = require("electron");
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+        shell.openExternal(url);
+      }
+    } catch (_) {}
+    return { action: "deny" };
+  });
 
   // Handle page load failures (wrong path, missing file, etc.)
   mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
