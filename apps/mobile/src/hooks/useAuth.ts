@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { Session } from '@ascension/api';
-import { useApi } from '@ascension/api';
+import { useApi } from './useApi';
 
 interface AuthState {
   session: Session | null;
