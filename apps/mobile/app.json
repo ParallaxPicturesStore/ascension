@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Ascension",
+    "slug": "ascension",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "ascension",
+    "userInterfaceStyle": "light",
+    "splash": { "backgroundColor": "#faf9f7" },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.getascension.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ascension needs camera access for profile photos"
+      }
+    },
+    "android": {
+      "adaptiveIcon": { "backgroundColor": "#faf9f7" },
+      "package": "app.getascension.mobile"
+    },
+    "plugins": ["expo-router"]
+  }
+}

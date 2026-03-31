@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@ascension/shared": ["../../packages/shared/src"],
+      "@ascension/ui": ["../../packages/ui/src"],
+      "@ascension/api": ["../../packages/api/src"],
+      "@ascension/monitoring": ["../../packages/monitoring/src"]
+    }
+  }
+}
