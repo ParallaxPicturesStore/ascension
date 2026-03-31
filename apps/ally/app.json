@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Ascension Ally",
+    "slug": "ascension-ally",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "ascension-ally",
+    "userInterfaceStyle": "light",
+    "splash": { "backgroundColor": "#faf9f7" },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.getascension.ally"
+    },
+    "android": {
+      "package": "app.getascension.ally"
+    },
+    "plugins": ["expo-router"]
+  }
+}
