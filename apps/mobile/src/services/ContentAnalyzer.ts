@@ -6,7 +6,6 @@
  */
 import {
   LOCAL_FLAG_THRESHOLD,
-  FLAG_THRESHOLD,
   ALERT_THRESHOLD,
 } from '@ascension/shared';
 

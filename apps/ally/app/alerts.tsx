@@ -1,9 +1,9 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { theme, ScreenLayout, AlertItem, Badge } from '@ascension/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
-import { useApi } from '@/hooks/useApi';
+import { useApi } from '@ascension/api';
 import type { Alert as AlertData } from '@ascension/api';
 
 export default function AlertsScreen() {
@@ -11,7 +11,7 @@ export default function AlertsScreen() {
   const { session } = useAuth();
   const { alerts, loading, refresh } = usePartner(session?.user?.id);
 
-  const unreadCount = alerts.filter((a) => !a.read).length;
+  const unreadCount = useMemo(() => alerts.filter((a) => !a.read).length, [alerts]);
 
   const handleMarkRead = useCallback(
     async (alertId: string) => {
@@ -26,7 +26,7 @@ export default function AlertsScreen() {
     [api, refresh],
   );
 
-  function renderAlert({ item }: { item: AlertData }) {
+  const renderAlert = useCallback(({ item }: { item: AlertData }) => {
     return (
       <TouchableOpacity
         onPress={() => {
@@ -42,7 +42,7 @@ export default function AlertsScreen() {
         />
       </TouchableOpacity>
     );
-  }
+  }, [handleMarkRead]);
 
   function renderEmpty() {
     if (loading) return null;

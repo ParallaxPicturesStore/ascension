@@ -11,7 +11,7 @@ import {
   theme,
 } from '@ascension/ui';
 import type { UserProfile, SubscriptionStatus } from '@ascension/api';
-import { useApi } from '../src/hooks/useApi';
+import { useApi } from '@ascension/api';
 import { useAuth } from '../src/hooks/useAuth';
 
 const STATUS_BADGE_MAP: Record<string, { text: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }> = {

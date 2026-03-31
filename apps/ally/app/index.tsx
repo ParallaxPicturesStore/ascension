@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -20,7 +20,7 @@ import {
 import { formatRelativeTime } from '@ascension/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
-import { useApi } from '@/hooks/useApi';
+import { useApi } from '@ascension/api';
 import type { Screenshot } from '@ascension/api';
 
 type FilterMode = 'all' | 'flagged';
@@ -58,15 +58,21 @@ export default function HomeScreen() {
     await Promise.all([refresh(), loadScreenshots()]);
   }, [refresh, loadScreenshots]);
 
-  const filteredScreenshots =
-    filter === 'flagged'
-      ? screenshots.filter((s) => s.flagged)
-      : screenshots;
+  const filteredScreenshots = useMemo(
+    () =>
+      filter === 'flagged'
+        ? screenshots.filter((s) => s.flagged)
+        : screenshots,
+    [filter, screenshots],
+  );
 
-  const unreadAlertCount = alerts.filter((a) => !a.read).length;
+  const unreadAlertCount = useMemo(
+    () => alerts.filter((a) => !a.read).length,
+    [alerts],
+  );
   const partnerName = partner?.name ?? 'Your partner';
 
-  function renderScreenshotItem({ item }: { item: Screenshot }) {
+  const renderScreenshotItem = useCallback(({ item }: { item: Screenshot }) => {
     return (
       <Card style={styles.feedItem}>
         {item.file_path ? (
@@ -88,7 +94,7 @@ export default function HomeScreen() {
         </View>
       </Card>
     );
-  }
+  }, []);
 
   function renderHeader() {
     return (

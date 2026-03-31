@@ -11,7 +11,6 @@
 import {
   startCapture,
   stopCapture,
-  getCaptureStatus,
   onScreenshotCaptured,
   type ScreenshotEvent,
   type CaptureStatus,
@@ -23,11 +22,6 @@ import {
   type AnalysisResult,
 } from './ContentAnalyzer';
 import { sendHeartbeat, reportFlag } from './AntiTamper';
-import {
-  CAPTURE_INTERVAL_MS,
-  LOCAL_FLAG_THRESHOLD,
-  AlertType,
-} from '@ascension/shared';
 
 // ---------------------------------------------------------------------------
 // Types

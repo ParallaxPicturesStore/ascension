@@ -17,7 +17,7 @@ const SEVERITY_COLORS = {
   info: theme.colors.muted,
 };
 
-export function AlertItem({ type, message, timestamp, read = false, style }: AlertItemProps) {
+export const AlertItem = React.memo(function AlertItem({ type, message, timestamp, read = false, style }: AlertItemProps) {
   const severity = getAlertSeverity(type as AlertType);
   const icon = ALERT_TYPE_ICONS[type as AlertType] || '\u{1F514}';
   const label = ALERT_TYPE_LABELS[type as AlertType] || type;
@@ -34,7 +34,7 @@ export function AlertItem({ type, message, timestamp, read = false, style }: Ale
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

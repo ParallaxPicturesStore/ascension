@@ -8,7 +8,7 @@ export interface StreakCounterProps {
   style?: ViewStyle;
 }
 
-export function StreakCounter({ currentStreak, longestStreak, style }: StreakCounterProps) {
+export const StreakCounter = React.memo(function StreakCounter({ currentStreak, longestStreak, style }: StreakCounterProps) {
   return (
     <View
       style={[styles.container, style]}
@@ -20,7 +20,7 @@ export function StreakCounter({ currentStreak, longestStreak, style }: StreakCou
       <Text style={styles.longest}>Longest: {longestStreak} {longestStreak === 1 ? 'day' : 'days'}</Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

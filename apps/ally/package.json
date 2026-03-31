@@ -19,11 +19,9 @@
     "react-native": "0.76.0",
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.1.0",
-    "@supabase/supabase-js": "^2.49.0",
     "@ascension/shared": "workspace:*",
     "@ascension/ui": "workspace:*",
-    "@ascension/api": "workspace:*",
-    "@ascension/monitoring": "workspace:*"
+    "@ascension/api": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "~18.3.0",

@@ -24,14 +24,14 @@ const BG_COLORS: Record<BadgeVariant, string> = {
   neutral: theme.colors.warmBg,
 };
 
-export function Badge({ text, variant = 'neutral', style }: BadgeProps) {
+export const Badge = React.memo(function Badge({ text, variant = 'neutral', style }: BadgeProps) {
   return (
     <View style={[styles.container, { backgroundColor: BG_COLORS[variant] }, style]}>
       <View style={[styles.dot, { backgroundColor: DOT_COLORS[variant] }]} />
       <Text style={styles.text}>{text}</Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { theme } from '@ascension/ui';
-import { ApiProvider } from '../src/contexts/ApiContext';
+import { ApiProvider, useApi } from '@ascension/api';
 import { useAuth } from '../src/hooks/useAuth';
-import { useApi } from '../src/hooks/useApi';
+import { config } from '../src/config';
 
 function AuthGate() {
   const api = useApi();
@@ -77,8 +77,16 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
+  const apiConfig = useMemo(
+    () => ({
+      supabaseUrl: config.supabaseUrl,
+      supabaseAnonKey: config.supabaseAnonKey,
+    }),
+    [],
+  );
+
   return (
-    <ApiProvider>
+    <ApiProvider config={apiConfig}>
       <StatusBar style="dark" />
       <AuthGate />
     </ApiProvider>

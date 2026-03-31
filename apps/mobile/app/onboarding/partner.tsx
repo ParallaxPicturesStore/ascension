@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenLayout, Input, Button, Card, theme } from '@ascension/ui';
-import { useApi } from '../../src/hooks/useApi';
+import { useApi } from '@ascension/api';
 import { useAuth } from '../../src/hooks/useAuth';
 
 export default function OnboardingPartnerScreen() {

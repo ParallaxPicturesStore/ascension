@@ -23,3 +23,7 @@ export type {
   Encouragement,
   CreateEncouragement,
 } from './types';
+
+// React context & hook (shared by mobile + ally)
+export { ApiProvider, useApi } from './context';
+export type { ApiProviderProps } from './context';

@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { theme } from '@ascension/ui';
-import { ApiProvider } from '@/contexts/ApiContext';
+import { ApiProvider } from '@ascension/api';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
+import { config } from '@/config';
 
 /**
  * Inner layout that handles auth-based routing.
@@ -56,8 +57,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const apiConfig = useMemo(
+    () => ({
+      supabaseUrl: config.supabaseUrl,
+      supabaseAnonKey: config.supabaseAnonKey,
+      functionsBaseUrl: config.functionsBaseUrl,
+    }),
+    [],
+  );
+
   return (
-    <ApiProvider>
+    <ApiProvider config={apiConfig}>
       <StatusBar style="dark" />
       <AuthGate>
         <Stack

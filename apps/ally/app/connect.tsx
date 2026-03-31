@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { theme, ScreenLayout, Input, Button, Card } from '@ascension/ui';
-import { useApi } from '@/hooks/useApi';
+import { useApi } from '@ascension/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
 

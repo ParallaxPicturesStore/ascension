@@ -6,9 +6,6 @@
   "scripts": {
     "test": "jest"
   },
-  "dependencies": {
-    "@sentry/core": "^8.0.0"
-  },
   "peerDependencies": {
     "react": ">=18.0.0"
   },

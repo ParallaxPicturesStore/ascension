@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { theme, ScreenLayout, Card, Input, Button, SectionHeader } from '@ascension/ui';
 import { formatRelativeTime } from '@ascension/shared';
-import { useApi } from '@/hooks/useApi';
+import { useApi } from '@ascension/api';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
 import type { Encouragement } from '@ascension/api';
