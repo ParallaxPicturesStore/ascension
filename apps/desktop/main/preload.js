@@ -35,8 +35,11 @@ contextBridge.exposeInMainWorld("ascension", {
   getRecentScreenshots: () => ipcRenderer.invoke("screenshots:recent"),
   getScreenshotStats: () => ipcRenderer.invoke("screenshots:stats"),
 
-  // Notify main process of login (starts watchdog)
-  notifyLoggedIn: (userId) => ipcRenderer.invoke("user:logged-in", userId),
+  // Notify main process of login (starts watchdog) — pass access token for Edge Function calls
+  notifyLoggedIn: (userId, accessToken) => ipcRenderer.invoke("user:logged-in", userId, accessToken),
+
+  // Send updated access token (e.g. after token refresh)
+  updateToken: (accessToken) => ipcRenderer.invoke("user:update-token", accessToken),
 
   // Shell
   openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),

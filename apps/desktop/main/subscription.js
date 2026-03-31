@@ -2,12 +2,13 @@
  * Subscription lapse management
  * - Checks subscription status on login and every 12 hours
  * - Grace period: Rekognition stays active for 30 days after lapse
- * - Sends reminder emails to user + partner at day 1, 7, 14, 30
+ * - Sends reminder emails via Edge Function at day 1, 7, 14, 30
  * - Remote kill switch: app_disabled flag in Supabase locks the UI
+ *
+ * Reads use anon key (RLS allows own row). Writes use Edge Function.
  */
 
-const { createClient } = require("@supabase/supabase-js");
-const { sendAlertEmail } = require("./alerts");
+const { getDb, callEdgeFunction, getAccessToken } = require("./api-client");
 
 const REKOGNITION_GRACE_DAYS = 30;
 
@@ -17,13 +18,6 @@ let appDisabled = false;
 let checkInterval = null;
 let currentUserId = null;
 let currentMainWindow = null;
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-  );
-}
 
 function daysSince(dateStr) {
   if (!dateStr) return 0;
@@ -45,37 +39,49 @@ function dueReminders(days, alreadySent) {
 }
 
 async function sendLapseReminders(user, dueKeys) {
-  const db = getSupabase();
+  const token = getAccessToken();
+  if (!token) return;
+
   const alreadySent = Array.isArray(user.lapse_reminders_sent) ? user.lapse_reminders_sent : [];
   const newSent = [...alreadySent];
 
   for (const key of dueKeys) {
-    await sendAlertEmail("subscription_lapse", user.email, user.name || "there", { key });
+    // Send to user
+    await callEdgeFunction("alerts.sendEmail", {
+      type: "subscription_lapse",
+      to: user.email,
+      userName: user.name || "there",
+      data: { key },
+    }, token).catch((err) => console.error(`[Subscription] Failed to send lapse email:`, err.message));
 
+    // Send to partner
     if (user.partner_email) {
-      await sendAlertEmail(
-        "subscription_lapse_partner",
-        user.partner_email,
-        user.name || "your partner",
-        { key }
-      );
+      await callEdgeFunction("alerts.sendEmail", {
+        type: "subscription_lapse_partner",
+        to: user.partner_email,
+        userName: user.name || "your partner",
+        data: { key },
+      }, token).catch((err) => console.error(`[Subscription] Failed to send partner lapse email:`, err.message));
     }
 
     newSent.push(key);
     console.log(`[Subscription] Lapse reminder '${key}' sent for user ${user.id}`);
   }
 
-  await db
-    .from("users")
-    .update({ lapse_reminders_sent: newSent })
-    .eq("id", user.id);
+  // Update the sent reminders list via Edge Function
+  await callEdgeFunction("subscription.updateReminders", {
+    user_id: user.id,
+    lapse_reminders_sent: newSent,
+  }, token).catch((err) => console.error("[Subscription] Failed to update reminders:", err.message));
 }
 
 async function checkSubscription() {
   if (!currentUserId) return;
 
   try {
-    const db = getSupabase();
+    const db = getDb();
+    if (!db) return;
+
     const { data: user } = await db
       .from("users")
       .select(
@@ -102,10 +108,13 @@ async function checkSubscription() {
       let lapseDate = user.subscription_lapse_date;
       if (!lapseDate) {
         lapseDate = new Date().toISOString();
-        await db
-          .from("users")
-          .update({ subscription_lapse_date: lapseDate })
-          .eq("id", user.id);
+        const token = getAccessToken();
+        if (token) {
+          await callEdgeFunction("subscription.setLapseDate", {
+            user_id: user.id,
+            lapse_date: lapseDate,
+          }, token).catch((err) => console.error("[Subscription] Failed to set lapse date:", err.message));
+        }
         console.log(`[Subscription] Lapse date recorded for user ${user.id}`);
       }
 
@@ -132,10 +141,12 @@ async function checkSubscription() {
 
       // Clear lapse data if they've resubscribed after a lapse
       if (user.subscription_lapse_date) {
-        await db
-          .from("users")
-          .update({ subscription_lapse_date: null, lapse_reminders_sent: [] })
-          .eq("id", user.id);
+        const token = getAccessToken();
+        if (token) {
+          await callEdgeFunction("subscription.clearLapse", {
+            user_id: user.id,
+          }, token).catch((err) => console.error("[Subscription] Failed to clear lapse:", err.message));
+        }
         console.log(`[Subscription] User ${user.id} resubscribed — lapse data cleared`);
       }
     }

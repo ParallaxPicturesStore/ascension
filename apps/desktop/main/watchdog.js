@@ -8,9 +8,11 @@
  *
  * The watchdog is spawned by the main process and deliberately kept simple
  * so it can't easily be killed alongside the main process.
+ *
+ * Uses the anon key only — no service role key needed. The heartbeat write
+ * is authenticated via the user's access token passed as argv[5].
  */
 
-const { createClient } = require("@supabase/supabase-js");
 const path = require("path");
 const fs = require("fs");
 
@@ -39,47 +41,51 @@ loadEnv();
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
-let supabase = null;
-
-function getSupabase() {
-  if (!supabase) {
-    supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-        ""
-    );
-  }
-  return supabase;
-}
-
-async function sendHeartbeat(userId) {
+async function sendHeartbeat(userId, accessToken) {
   try {
-    await getSupabase()
-      .from("users")
-      .update({ last_heartbeat: new Date().toISOString() })
-      .eq("id", userId);
-    process.stdout.write(`[Watchdog] Heartbeat sent for ${userId}\n`);
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ascension-api`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        action: "watchdog.heartbeat",
+        payload: { user_id: userId },
+      }),
+    });
+    if (!res.ok) {
+      process.stderr.write(`[Watchdog] Heartbeat HTTP ${res.status}\n`);
+    } else {
+      process.stdout.write(`[Watchdog] Heartbeat sent for ${userId}\n`);
+    }
   } catch (err) {
     process.stderr.write(`[Watchdog] Heartbeat failed: ${err.message}\n`);
   }
 }
 
-// Args: userId, mainPid, execPath
+// Args: userId, mainPid, execPath, accessToken
 const userId = process.argv[2];
 const mainPid = parseInt(process.argv[3]) || null;
 const execPath = process.argv[4] || null;
+const accessToken = process.argv[5] || null;
 
 if (!userId) {
   process.stderr.write("[Watchdog] No userId provided - exiting\n");
   process.exit(1);
 }
 
+if (!accessToken) {
+  process.stderr.write("[Watchdog] No access token provided - exiting\n");
+  process.exit(1);
+}
+
 process.stdout.write(`[Watchdog] Started for user ${userId} (watching PID ${mainPid})\n`);
 
 // Send heartbeat immediately then on interval
-sendHeartbeat(userId);
-setInterval(() => sendHeartbeat(userId), HEARTBEAT_INTERVAL_MS);
+sendHeartbeat(userId, accessToken);
+setInterval(() => sendHeartbeat(userId, accessToken), HEARTBEAT_INTERVAL_MS);
 
 // Monitor main process - if it dies and we're in production, relaunch it
 const { spawn } = require("child_process");

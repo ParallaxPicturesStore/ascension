@@ -1,19 +1,14 @@
-const { createClient } = require("@supabase/supabase-js");
+/**
+ * Streak module — reads use anon key (RLS), writes use Edge Function.
+ */
 
-let supabase = null;
-
-function getSupabase() {
-  if (!supabase) {
-    supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    );
-  }
-  return supabase;
-}
+const { getDb, callEdgeFunction, getAccessToken } = require("./api-client");
 
 async function getStreak(userId) {
-  const { data, error } = await getSupabase()
+  const db = getDb();
+  if (!db) return null;
+
+  const { data, error } = await db
     .from("streaks")
     .select("*")
     .eq("user_id", userId)
@@ -27,58 +22,36 @@ async function getStreak(userId) {
 }
 
 async function resetStreak(userId) {
-  const now = new Date().toISOString();
-
-  const { data: current } = await getSupabase()
-    .from("streaks")
-    .select("current_streak, longest_streak")
-    .eq("user_id", userId)
-    .single();
-
-  const { error } = await getSupabase()
-    .from("streaks")
-    .update({
-      current_streak: 0,
-      last_relapse_date: now,
-      longest_streak: Math.max(current?.longest_streak || 0, current?.current_streak || 0),
-      updated_at: now,
-    })
-    .eq("user_id", userId);
-
-  if (error) {
-    console.error("[Streak] Error resetting:", error.message);
+  const token = getAccessToken();
+  if (!token) {
+    console.error("[Streak] No access token — cannot reset streak");
     return false;
   }
 
-  console.log(`[Streak] Reset for user ${userId} - previous: ${current?.current_streak} days`);
-  return true;
+  try {
+    await callEdgeFunction("streaks.reset", { user_id: userId }, token);
+    console.log(`[Streak] Reset for user ${userId}`);
+    return true;
+  } catch (err) {
+    console.error("[Streak] Error resetting:", err.message);
+    return false;
+  }
 }
 
 async function incrementStreak(userId) {
-  const { data: current } = await getSupabase()
-    .from("streaks")
-    .select("current_streak, longest_streak")
-    .eq("user_id", userId)
-    .single();
-
-  if (!current) return false;
-
-  const newStreak = current.current_streak + 1;
-  const { error } = await getSupabase()
-    .from("streaks")
-    .update({
-      current_streak: newStreak,
-      longest_streak: Math.max(current.longest_streak, newStreak),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId);
-
-  if (error) {
-    console.error("[Streak] Error incrementing:", error.message);
+  const token = getAccessToken();
+  if (!token) {
+    console.error("[Streak] No access token — cannot increment streak");
     return false;
   }
 
-  return true;
+  try {
+    await callEdgeFunction("streaks.increment", { user_id: userId }, token);
+    return true;
+  } catch (err) {
+    console.error("[Streak] Error incrementing:", err.message);
+    return false;
+  }
 }
 
 // Run daily at midnight to increment streaks for all active users
@@ -103,11 +76,14 @@ function startDailyStreakUpdate() {
 async function updateAllStreaks() {
   console.log("[Streak] Running daily streak update");
 
+  const db = getDb();
+  if (!db) return;
+
   // Get all users who haven't relapsed today
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const { data: streaks, error } = await getSupabase()
+  const { data: streaks, error } = await db
     .from("streaks")
     .select("user_id, current_streak, longest_streak, last_relapse_date");
 
@@ -128,21 +104,24 @@ async function updateAllStreaks() {
 }
 
 async function getWeeklyStats(userId) {
+  const db = getDb();
+  if (!db) return { screenshotCount: 0, blockedCount: 0, flaggedCount: 0 };
+
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
   const [screenshots, blocked, alerts] = await Promise.all([
-    getSupabase()
+    db
       .from("screenshots")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("timestamp", weekAgo.toISOString()),
-    getSupabase()
+    db
       .from("blocked_attempts")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("timestamp", weekAgo.toISOString()),
-    getSupabase()
+    db
       .from("screenshots")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)

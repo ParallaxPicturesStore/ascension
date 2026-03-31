@@ -4,11 +4,10 @@ const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { createClient } = require("@supabase/supabase-js");
+const { getDb, callEdgeFunction, getAccessToken } = require("./api-client");
 const { analyzeImage } = require("./rekognition");
 const { analyzeLocally } = require("./local-analyzer");
 const { isRekognitionEnabled } = require("./subscription");
-const { sendAlertEmail } = require("./alerts");
 const { resetStreak } = require("./streak");
 
 const CAPTURE_INTERVAL_MS = 60 * 1000;
@@ -18,20 +17,9 @@ const ALERT_THRESHOLD = 90;
 let captureTimer = null;
 let captureState = "active";
 let mainWindowRef = null;
-let supabase = null;
 let currentUserId = null;
 
 const tempDir = path.join(os.tmpdir(), "ascension-captures");
-
-function getSupabase() {
-  if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-  }
-  return supabase;
-}
 
 function ensureTempDir() {
   if (!fs.existsSync(tempDir)) {
@@ -54,9 +42,9 @@ async function blurScreenshot(buffer) {
   return sharp(buffer).blur(40).jpeg({ quality: 30 }).toBuffer();
 }
 
-// Get the current user's info for alert context
+// Get the current user's info for alert context (anon key — RLS allows own row)
 async function getCurrentUser() {
-  const db = getSupabase();
+  const db = getDb();
   if (!db || !currentUserId) return null;
 
   const { data } = await db
@@ -110,18 +98,18 @@ async function captureAndAnalyze() {
     const flagged = maxConfidence >= FLAG_THRESHOLD;
     const immediateAlert = maxConfidence >= ALERT_THRESHOLD;
 
-    const db = getSupabase();
     const user = await getCurrentUser();
+    const token = getAccessToken();
 
-    // Log screenshot to Supabase
-    if (db && user) {
-      await db.from("screenshots").insert({
+    // Log screenshot to Supabase via Edge Function
+    if (user && token) {
+      await callEdgeFunction("screenshots.log", {
         user_id: user.id,
         timestamp,
         rekognition_score: maxConfidence,
         flagged,
         labels: analysis.labels,
-      });
+      }, token).catch((err) => console.error("[Capture] Failed to log screenshot:", err.message));
     }
 
     if (flagged) {
@@ -140,22 +128,27 @@ async function captureAndAnalyze() {
         console.log(`[Capture] Streak reset for ${user.name}`);
       }
 
-      // Create alert in Supabase
-      if (db && user && user.partner_id) {
-        await db.from("alerts").insert({
+      // Create alert in Supabase via Edge Function
+      if (user && user.partner_id && token) {
+        await callEdgeFunction("alerts.create", {
           user_id: user.id,
           partner_id: user.partner_id,
           type: "content_detected",
           message: `Explicit content detected with ${maxConfidence.toFixed(0)}% confidence. Labels: ${analysis.labels.join(", ")}`,
-        });
+        }, token).catch((err) => console.error("[Capture] Failed to create alert:", err.message));
       }
 
-      // Send email to partner
-      if (user?.partner_email) {
-        await sendAlertEmail("content_detected", user.partner_email, user.name, {
-          confidence: maxConfidence.toFixed(0),
-          labels: analysis.labels.join(", "),
-        });
+      // Send email to partner via Edge Function
+      if (user?.partner_email && token) {
+        await callEdgeFunction("alerts.sendEmail", {
+          type: "content_detected",
+          to: user.partner_email,
+          userName: user.name,
+          data: {
+            confidence: maxConfidence.toFixed(0),
+            labels: analysis.labels.join(", "),
+          },
+        }, token).catch((err) => console.error("[Capture] Failed to send alert email:", err.message));
       }
 
       // Notify renderer
@@ -217,23 +210,26 @@ async function pauseCapture() {
   console.log("[Capture] Engine paused - sending evasion alert");
 
   try {
-    // Send evasion alert
+    // Send evasion alert via Edge Function
     const user = await getCurrentUser();
-    const db = getSupabase();
+    const token = getAccessToken();
 
-    if (db && user && user.partner_id) {
-      await db.from("alerts").insert({
+    if (user && user.partner_id && token) {
+      await callEdgeFunction("alerts.create", {
         user_id: user.id,
         partner_id: user.partner_id,
         type: "evasion",
         message: "Monitoring was paused by the user.",
-      });
+      }, token);
     }
 
-    if (user?.partner_email) {
-      await sendAlertEmail("evasion", user.partner_email, user.name, {
-        action: "paused",
-      });
+    if (user?.partner_email && token) {
+      await callEdgeFunction("alerts.sendEmail", {
+        type: "evasion",
+        to: user.partner_email,
+        userName: user.name,
+        data: { action: "paused" },
+      }, token);
     }
   } catch (err) {
     console.error("[Capture] Failed to send pause evasion alert:", err.message);

@@ -47,6 +47,7 @@ const { startDailyStreakUpdate } = require("./streak");
 const { sendAlertEmail } = require("./alerts");
 const { setupBlocking } = require("./blocker");
 const { initSubscriptionCheck } = require("./subscription");
+const { getAccessToken } = require("./api-client");
 
 let mainWindow = null;
 let watchdogProcess = null;
@@ -166,7 +167,8 @@ function spawnWatchdog(userId) {
   currentUserId = userId;
   const watchdogPath = path.join(__dirname, "watchdog.js");
   const execPath = app.getPath("exe");
-  watchdogProcess = spawn(process.execPath, [watchdogPath, userId, process.pid, execPath], {
+  const token = getAccessToken() || "";
+  watchdogProcess = spawn(process.execPath, [watchdogPath, userId, process.pid, execPath, token], {
     detached: true,
     stdio: "ignore",
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
@@ -202,11 +204,9 @@ async function confirmQuit(reason) {
 async function sendEvasionAlert(action) {
   if (!currentUserId) return;
   try {
-    const { createClient } = require("@supabase/supabase-js");
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    );
+    const { getDb } = require("./api-client");
+    const db = getDb();
+    if (!db) return;
     const { data: user } = await db
       .from("users")
       .select("name, partner_email")

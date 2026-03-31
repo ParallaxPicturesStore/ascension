@@ -1,71 +1,29 @@
-const {
-  RekognitionClient,
-  DetectModerationLabelsCommand,
-} = require("@aws-sdk/client-rekognition");
+/**
+ * Rekognition module — image analysis is routed through the Edge Function.
+ * No AWS credentials are needed on the client.
+ */
 
-// Categories we care about
-const FLAGGED_CATEGORIES = [
-  "Explicit Nudity",
-  "Nudity",
-  "Suggestive",
-  "Sexual Activity",
-  "Graphic Male Nudity",
-  "Graphic Female Nudity",
-  "Violence",
-];
-
-let client = null;
-
-function getClient() {
-  if (!client) {
-    client = new RekognitionClient({
-      region: process.env.AWS_REGION || "us-east-1",
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      },
-    });
-  }
-  return client;
-}
+const { callEdgeFunction, getAccessToken } = require("./api-client");
 
 async function analyzeImage(imageBuffer) {
-  // If no AWS credentials configured, return clean result (dev mode)
-  if (!process.env.AWS_ACCESS_KEY_ID) {
-    console.log("[Rekognition] No AWS credentials - skipping analysis (dev mode)");
-    return {
-      labels: [],
-      maxConfidence: 0,
-      raw: [],
-    };
+  const token = getAccessToken();
+  if (!token) {
+    console.log("[Rekognition] No access token - skipping analysis");
+    return { labels: [], maxConfidence: 0, raw: [] };
   }
 
   try {
-    const command = new DetectModerationLabelsCommand({
-      Image: { Bytes: imageBuffer },
-      MinConfidence: 50,
-    });
+    // Convert buffer to base64 for transport
+    const base64Image = imageBuffer.toString("base64");
 
-    const response = await getClient().send(command);
-    const labels = response.ModerationLabels || [];
-
-    // Filter to only our flagged categories
-    const relevant = labels.filter((label) =>
-      FLAGGED_CATEGORIES.some(
-        (cat) =>
-          label.Name?.includes(cat) || label.ParentName?.includes(cat)
-      )
-    );
-
-    const maxConfidence =
-      relevant.length > 0
-        ? Math.max(...relevant.map((l) => l.Confidence || 0))
-        : 0;
+    const result = await callEdgeFunction("rekognition.analyze", {
+      base64Image,
+    }, token);
 
     return {
-      labels: relevant.map((l) => `${l.Name} (${l.Confidence?.toFixed(1)}%)`),
-      maxConfidence,
-      raw: labels,
+      labels: result.labels || [],
+      maxConfidence: result.maxConfidence || 0,
+      raw: result.raw || [],
     };
   } catch (err) {
     console.error("[Rekognition] Analysis failed:", err.message);

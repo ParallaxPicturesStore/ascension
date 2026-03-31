@@ -1,5 +1,5 @@
 const { ipcMain, app, shell } = require("electron");
-const { createClient } = require("@supabase/supabase-js");
+const { getDb, callEdgeFunction, setAccessToken, getAccessToken } = require("./api-client");
 const { pauseCapture, resumeCapture, getCaptureState } = require("./capture");
 const { sendAlertEmail } = require("./alerts");
 const { getStreak, resetStreak, getWeeklyStats } = require("./streak");
@@ -7,13 +7,6 @@ const { createCheckoutSession, getSubscriptionStatus, createCustomerPortalSessio
 const { hashQuitPassword } = require("./crypto-utils");
 
 let currentUserId = null;
-
-function getDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-  );
-}
 
 function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
   // Capture control
@@ -132,7 +125,7 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
     return { success: false };
   });
 
-  // Screenshot data
+  // Screenshot data (reads via anon key — RLS allows own data)
   ipcMain.handle("screenshots:recent", async () => {
     if (!currentUserId) return [];
     const { data } = await getDb()
@@ -146,12 +139,13 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
 
   ipcMain.handle("screenshots:stats", async () => {
     if (!currentUserId) return { totalCaptures: 0, flaggedCount: 0, lastCaptureTime: null };
+    const db = getDb();
     const [total, flagged] = await Promise.all([
-      getDb()
+      db
         .from("screenshots")
         .select("id", { count: "exact", head: true })
         .eq("user_id", currentUserId),
-      getDb()
+      db
         .from("screenshots")
         .select("timestamp")
         .eq("user_id", currentUserId)
@@ -167,18 +161,32 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
   });
 
   // Notify main process that user has logged in - starts watchdog
-  ipcMain.handle("user:logged-in", (_, userId) => {
+  // Also receives the access token for Edge Function calls
+  ipcMain.handle("user:logged-in", (_, userId, accessToken) => {
     // Validate userId is a UUID to prevent injection
     if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
       console.warn("[IPC] Invalid userId rejected");
       return { ok: false, error: "Invalid user ID" };
     }
     currentUserId = userId;
+    // Store the access token for all Edge Function calls
+    if (accessToken) {
+      setAccessToken(accessToken);
+    }
     if (onUserLoggedIn) onUserLoggedIn(userId);
     return { ok: true };
   });
 
-  // Set the quit password (hashed and stored in Supabase)
+  // Receive updated access token (e.g. after refresh)
+  ipcMain.handle("user:update-token", (_, accessToken) => {
+    if (typeof accessToken === "string" && accessToken.length > 0) {
+      setAccessToken(accessToken);
+      return { ok: true };
+    }
+    return { ok: false, error: "Invalid token" };
+  });
+
+  // Set the quit password (hashed and stored via Edge Function)
   ipcMain.handle("user:set-quit-password", async (_, { userId, password }) => {
     if (typeof password !== "string" || password.length < 4) {
       return { success: false, error: "Password must be at least 4 characters" };
@@ -192,11 +200,19 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
       return { success: false, error: "Cannot set password for another user" };
     }
     const hash = hashQuitPassword(password, userId);
-    const { error } = await getDb()
-      .from("users")
-      .update({ partner_password_hash: hash })
-      .eq("id", userId);
-    return { success: !error, error: error?.message };
+    const token = getAccessToken();
+    if (!token) {
+      return { success: false, error: "No access token" };
+    }
+    try {
+      await callEdgeFunction("user.setQuitPassword", {
+        user_id: userId,
+        password_hash: hash,
+      }, token);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   });
 
   // Open external URL — only allow http(s) to prevent arbitrary protocol execution
