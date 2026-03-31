@@ -3,18 +3,22 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 
-// Crash logging
+// Crash logging - robust file-based logging with timestamps
 const logFile = path.join(app.getPath("userData"), "crash.log");
 function crashLog(msg) {
-  try { fs.appendFileSync(logFile, new Date().toISOString() + " " + msg + "\n"); } catch (_) {}
+  try {
+    const timestamp = new Date().toISOString();
+    const line = `[${timestamp}] ${msg}\n`;
+    fs.appendFileSync(logFile, line);
+  } catch (_) {}
 }
 process.on("uncaughtException", (err) => {
-  crashLog("UNCAUGHT: " + err.stack);
+  crashLog("UNCAUGHT EXCEPTION: " + (err ? err.stack || err.message || String(err) : "unknown"));
 });
-process.on("unhandledRejection", (err) => {
-  crashLog("UNHANDLED: " + (err && err.stack ? err.stack : String(err)));
+process.on("unhandledRejection", (reason) => {
+  crashLog("UNHANDLED REJECTION: " + (reason && reason.stack ? reason.stack : String(reason)));
 });
-crashLog("App starting...");
+crashLog("=== App starting (pid: " + process.pid + ", platform: " + process.platform + ", packaged: " + (app.isPackaged ? "yes" : "no") + ") ===");
 
 // Load env vars from .env.local in dev
 try {
@@ -50,7 +54,31 @@ let currentUserId = null;
 let allowQuit = false;
 const isDev = !app.isPackaged;
 
+function getProductionUrl() {
+  // When packaged, __dirname is inside app.asar/main/
+  // The static export is at app.asar/out/index.html
+  // Try multiple candidate paths to handle different packaging layouts
+  const candidates = [
+    path.join(__dirname, "../out/index.html"),
+    path.join(app.getAppPath(), "out/index.html"),
+    path.join(app.getAppPath(), "out", "index.html"),
+  ];
+
+  for (const candidate of candidates) {
+    crashLog("Checking production path: " + candidate + " exists=" + fs.existsSync(candidate));
+    if (fs.existsSync(candidate)) {
+      return `file://${candidate}`;
+    }
+  }
+
+  // Fallback to the first candidate even if it doesn't exist (will trigger did-fail-load)
+  crashLog("WARNING: No production index.html found, using fallback path");
+  return `file://${candidates[0]}`;
+}
+
 function createWindow() {
+  crashLog("Creating BrowserWindow...");
+
   mainWindow = new BrowserWindow({
     width: 440,
     height: 720,
@@ -65,15 +93,32 @@ function createWindow() {
     },
   });
 
-  const url = isDev
-    ? "http://localhost:3001"
-    : `file://${path.join(__dirname, "../out/index.html")}`;
+  const url = isDev ? "http://localhost:3001" : getProductionUrl();
+  crashLog("Loading URL: " + url);
+
+  // Fallback: if ready-to-show never fires (e.g. page load fails), show window after 5s
+  const showFallbackTimer = setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      crashLog("Fallback: showing window after 5s timeout (ready-to-show never fired)");
+      mainWindow.show();
+    }
+  }, 5000);
 
   mainWindow.loadURL(url);
 
   if (isDev) {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
+
+  // Handle page load failures (wrong path, missing file, etc.)
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
+    crashLog("did-fail-load: code=" + errorCode + " desc=" + errorDescription + " url=" + validatedURL);
+    console.error("[Main] Page failed to load:", errorDescription, validatedURL);
+  });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    crashLog("Page loaded successfully");
+  });
 
   mainWindow.on("close", (e) => {
     if (!allowQuit) {
@@ -84,6 +129,8 @@ function createWindow() {
   });
 
   mainWindow.on("ready-to-show", () => {
+    clearTimeout(showFallbackTimer);
+    crashLog("ready-to-show fired, showing window");
     mainWindow.show();
   });
 
@@ -161,20 +208,37 @@ function onUserLoggedIn(userId) {
 }
 
 app.whenReady().then(async () => {
+  crashLog("app.whenReady() fired");
+
   Menu.setApplicationMenu(null);
+  crashLog("Step 1/7: Creating window...");
   mainWindow = createWindow();
+
+  crashLog("Step 2/7: Creating tray...");
   createTray(mainWindow, confirmQuit);
+
+  crashLog("Step 3/7: Registering IPC handlers...");
   registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit);
+
+  crashLog("Step 4/7: Setting up auto-launch...");
   setupAutoLaunch();
+
+  crashLog("Step 5/7: Starting capture engine...");
   startCapture(mainWindow);
+
+  crashLog("Step 6/7: Setting up protection...");
   setupProtection(mainWindow);
+
+  crashLog("Step 7/7: Starting daily streak update...");
   startDailyStreakUpdate();
 
   // Hosts-file URL blocking — silent if elevation is denied
   setupBlocking().catch((err) => {
+    crashLog("Blocker setup failed: " + err.message);
     console.error("[Main] Blocker setup failed:", err.message);
   });
 
+  crashLog("=== Startup complete ===");
   console.log("[Ascension] App started successfully");
 });
 

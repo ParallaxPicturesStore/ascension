@@ -94,11 +94,28 @@ function isProcessAlive(pid) {
   }
 }
 
+function isPackagedApp() {
+  if (!execPath) return false;
+  // Windows: path ends with .exe
+  if (execPath.endsWith(".exe")) return true;
+  // macOS: path contains .app bundle
+  if (execPath.includes(".app/")) return true;
+  // Linux: path is in /usr, /opt, or AppImage
+  if (execPath.startsWith("/usr/") || execPath.startsWith("/opt/") || execPath.includes("AppImage")) return true;
+  return false;
+}
+
 function relaunchApp() {
-  if (!execPath || !execPath.endsWith(".exe")) return; // dev mode - don't relaunch
+  if (!isPackagedApp()) return; // dev mode - don't relaunch
   process.stdout.write("[Watchdog] Main process gone - relaunching...\n");
   try {
-    spawn(execPath, [], { detached: true, stdio: "ignore" }).unref();
+    if (process.platform === "darwin") {
+      // On macOS, use 'open' to launch the .app bundle properly
+      const appBundlePath = execPath.split(".app/")[0] + ".app";
+      spawn("open", [appBundlePath], { detached: true, stdio: "ignore" }).unref();
+    } else {
+      spawn(execPath, [], { detached: true, stdio: "ignore" }).unref();
+    }
   } catch (err) {
     process.stderr.write(`[Watchdog] Relaunch failed: ${err.message}\n`);
   }
