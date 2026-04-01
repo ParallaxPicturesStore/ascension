@@ -58,6 +58,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   inner: {
+    flex: 1,
     paddingHorizontal: theme.spacing.base,
     paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing['3xl'],
