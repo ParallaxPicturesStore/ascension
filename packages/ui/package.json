@@ -5,5 +5,9 @@
   "types": "src/index.ts",
   "scripts": {
     "test": "jest"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.72.0"
   }
 }

@@ -16,12 +16,9 @@ config.resolver.nodeModulesPaths = [
 ];
 
 // Ensure only one copy of react - use the LOCAL copy (React 18 for Expo)
-const reactPath = path.resolve(projectRoot, 'node_modules/react');
-const reactNativePath = path.resolve(projectRoot, 'node_modules/react-native');
-
 config.resolver.extraNodeModules = {
-  'react': reactPath,
-  'react-native': reactNativePath,
+  'react': path.resolve(projectRoot, 'node_modules/react'),
+  'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
   'react-native-web': path.resolve(projectRoot, 'node_modules/react-native-web'),
   'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
 };
