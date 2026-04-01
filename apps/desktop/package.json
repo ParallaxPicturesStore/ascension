@@ -62,7 +62,7 @@
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico",
-      "requestedExecutionLevel": "requireAdministrator"
+      "requestedExecutionLevel": "asInvoker"
     },
     "mac": {
       "target": "dmg",

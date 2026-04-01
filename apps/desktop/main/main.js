@@ -171,8 +171,9 @@ function createWindow() {
 
   mainWindow.loadURL(url);
 
-  // Temporarily enable devtools for debugging white screen
-  mainWindow.webContents.openDevTools({ mode: "detach" });
+  if (isDev) {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
 
   // SECURITY: Prevent navigation to untrusted origins
   mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
