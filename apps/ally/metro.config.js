@@ -23,25 +23,17 @@ config.resolver.extraNodeModules = {
   'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
 };
 
-// Force all react imports to resolve to the same copy, even from packages/
-const originalResolveRequest = config.resolver.resolveRequest;
+// Force all react/react-native imports to resolve to the app's local copy
+const allyReactPath = path.resolve(projectRoot, 'node_modules/react');
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === 'react' || moduleName.startsWith('react/')) {
-    return context.resolveRequest(
-      { ...context, resolveRequest: undefined },
-      moduleName,
-      platform,
-    );
+  if (moduleName === 'react') {
+    return { type: 'sourceFile', filePath: path.resolve(allyReactPath, 'index.js') };
   }
-  if (moduleName === 'react-native' || moduleName.startsWith('react-native/')) {
-    return context.resolveRequest(
-      { ...context, resolveRequest: undefined },
-      moduleName,
-      platform,
-    );
+  if (moduleName === 'react/jsx-runtime') {
+    return { type: 'sourceFile', filePath: path.resolve(allyReactPath, 'jsx-runtime.js') };
   }
-  if (originalResolveRequest) {
-    return originalResolveRequest(context, moduleName, platform);
+  if (moduleName === 'react/jsx-dev-runtime') {
+    return { type: 'sourceFile', filePath: path.resolve(allyReactPath, 'jsx-dev-runtime.js') };
   }
   return context.resolveRequest(
     { ...context, resolveRequest: undefined },

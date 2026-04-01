@@ -26,25 +26,18 @@ config.resolver.extraNodeModules = {
   'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
 };
 
-// Force all react imports to resolve to the same copy, even from packages/
-const originalResolveRequest = config.resolver.resolveRequest;
+// Force all react/react-native imports to resolve to the app's local copy
+// This prevents the monorepo root's React 19 from being bundled alongside
+// the app's React 18, which causes "ReactCurrentDispatcher" crashes
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === 'react' || moduleName.startsWith('react/')) {
-    return context.resolveRequest(
-      { ...context, resolveRequest: undefined },
-      moduleName,
-      platform,
-    );
+  if (moduleName === 'react') {
+    return { type: 'sourceFile', filePath: path.resolve(reactPath, 'index.js') };
   }
-  if (moduleName === 'react-native' || moduleName.startsWith('react-native/')) {
-    return context.resolveRequest(
-      { ...context, resolveRequest: undefined },
-      moduleName,
-      platform,
-    );
+  if (moduleName === 'react/jsx-runtime') {
+    return { type: 'sourceFile', filePath: path.resolve(reactPath, 'jsx-runtime.js') };
   }
-  if (originalResolveRequest) {
-    return originalResolveRequest(context, moduleName, platform);
+  if (moduleName === 'react/jsx-dev-runtime') {
+    return { type: 'sourceFile', filePath: path.resolve(reactPath, 'jsx-dev-runtime.js') };
   }
   return context.resolveRequest(
     { ...context, resolveRequest: undefined },
