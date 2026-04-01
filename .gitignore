@@ -36,3 +36,9 @@ electron-builder/Cache/
 # Logs
 *.log
 crash.log
+
+# Test NSFW images - never commit
+apps/desktop/test/*.jpg
+apps/desktop/test/*.webp
+apps/desktop/test/*.png
+apps/desktop/test-nsfw.*
