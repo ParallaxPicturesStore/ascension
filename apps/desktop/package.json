@@ -18,14 +18,15 @@
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.700.0",
     "@supabase/supabase-js": "^2.49.0",
+    "@tailwindcss/postcss": "^4.0.0",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-cpu": "^4.22.0",
-    "nsfwjs": "^4.1.0",
-    "@tailwindcss/postcss": "^4.0.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
     "auto-launch": "^5.0.6",
     "electron-store": "^10.0.0",
     "lucide-react": "^0.469.0",
     "next": "^16.2.0",
+    "nsfwjs": "^4.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.9.4",
@@ -36,14 +37,14 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
+    "@types/react": "19.2.14",
     "@types/react-dom": "^19.0.0",
     "concurrently": "^9.1.0",
-    "electron": "^32.3.3",
-    "electron-builder": "^25.1.0",
+    "electron": "32.3.3",
+    "electron-builder": "^25.1.8",
     "pg": "^8.20.0",
     "png-to-ico": "^2.1.8",
-    "typescript": "^5.7.0",
+    "typescript": "5.9.3",
     "wait-on": "^8.0.0"
   },
   "build": {
@@ -77,5 +78,7 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Ascension"
     }
-  }
+  },
+  "keywords": [],
+  "license": "ISC"
 }
