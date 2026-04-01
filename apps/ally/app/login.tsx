@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { theme, ScreenLayout, Input, Button } from '@ascension/ui';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -15,10 +15,7 @@ export default function LoginScreen() {
 
   return (
     <ScreenLayout>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.container}
-      >
+      <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Ascension Ally</Text>
           <Text style={styles.subtitle}>
@@ -58,7 +55,7 @@ export default function LoginScreen() {
           Your partner invited you to help them stay accountable. Sign in with
           the account you created when you accepted the invitation.
         </Text>
-      </KeyboardAvoidingView>
+      </View>
     </ScreenLayout>
   );
 }

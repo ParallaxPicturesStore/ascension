@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenLayout, Input, Button, theme } from '@ascension/ui';
 import { useAuth } from '../src/hooks/useAuth';
@@ -37,10 +37,7 @@ export default function LoginScreen() {
 
   return (
     <ScreenLayout scrollable={false}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.logo}>Ascension</Text>
           <Text style={styles.subtitle}>Welcome back</Text>
@@ -84,7 +81,7 @@ export default function LoginScreen() {
             <Text style={styles.link}>Sign Up</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </ScreenLayout>
   );
 }
