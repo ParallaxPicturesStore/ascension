@@ -1,6 +1,14 @@
 import React, { type ReactNode } from 'react';
-import { StyleSheet, View, ScrollView, Text, type ViewStyle, type RefreshControlProps } from 'react-native';
+import { StyleSheet, View, ScrollView, Text, Platform, type ViewStyle, type RefreshControlProps } from 'react-native';
 import { theme } from '../theme';
+
+// Use SafeAreaView on native, plain View on web
+let SafeAreaView: typeof View;
+try {
+  SafeAreaView = require('react-native-safe-area-context').SafeAreaView;
+} catch {
+  SafeAreaView = View;
+}
 
 export interface ScreenLayoutProps {
   title?: string;
@@ -18,26 +26,33 @@ export function ScreenLayout({ title, children, scrollable = true, style, refres
     </View>
   );
 
+  const Wrapper = Platform.OS === 'web' ? View : SafeAreaView;
+
   if (scrollable) {
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={refreshControl}
-      >
-        {content}
-      </ScrollView>
+      <Wrapper style={styles.container}>
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+        >
+          {content}
+        </ScrollView>
+      </Wrapper>
     );
   }
 
-  return <View style={styles.container}>{content}</View>;
+  return <Wrapper style={styles.container}>{content}</Wrapper>;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  scrollContainer: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,

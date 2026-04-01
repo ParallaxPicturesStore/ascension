@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { theme } from '@ascension/ui';
 import { createApiClient } from '@ascension/api';
 import type { AscensionAPI } from '@ascension/api';
@@ -76,18 +77,20 @@ export default function RootLayout() {
   );
 
   return (
-    <ApiContext.Provider value={api}>
-      <StatusBar style="dark" />
-      <AuthGate>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: theme.colors.background },
-            animation: 'fade',
-          }}
-        />
-      </AuthGate>
-    </ApiContext.Provider>
+    <SafeAreaProvider>
+      <ApiContext.Provider value={api}>
+        <StatusBar style="dark" />
+        <AuthGate>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.colors.background },
+              animation: 'fade',
+            }}
+          />
+        </AuthGate>
+      </ApiContext.Provider>
+    </SafeAreaProvider>
   );
 }
 
