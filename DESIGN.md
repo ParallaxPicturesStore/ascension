@@ -60,7 +60,7 @@ All tokens live in `@ascension/ui` and must be imported from there. Never hardco
 | `iconLg` | 22px | Large icons |
 | `iconXl` | 48px | Extra large icons (empty states) |
 
-Font: **DM Sans** (regular 400, medium 500, bold 700)
+Font: **Nunito** (regular 400, medium 500, bold 700)
 
 ### Border Radius
 

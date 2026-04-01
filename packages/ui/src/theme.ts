@@ -75,7 +75,7 @@ export const theme = {
       elevation: 4,
     },
   },
-  fontFamily: 'DM Sans',
+  fontFamily: 'Nunito',
 } as const;
 
 export type Theme = typeof theme;

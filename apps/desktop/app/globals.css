@@ -28,7 +28,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-  --font-sans: var(--font-dm-sans);
+  --font-sans: var(--font-nunito);
 }
 
 body {
