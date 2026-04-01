@@ -1,14 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { StyleSheet, View, ScrollView, Text, Platform, type ViewStyle, type RefreshControlProps } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
-
-// Use SafeAreaView on native, plain View on web
-let SafeAreaView: typeof View;
-try {
-  SafeAreaView = require('react-native-safe-area-context').SafeAreaView;
-} catch {
-  SafeAreaView = View;
-}
 
 export interface ScreenLayoutProps {
   title?: string;
@@ -26,7 +19,7 @@ export function ScreenLayout({ title, children, scrollable = true, style, refres
     </View>
   );
 
-  const Wrapper = Platform.OS === 'web' ? View : SafeAreaView;
+  const Wrapper = SafeAreaView;
 
   if (scrollable) {
     return (
