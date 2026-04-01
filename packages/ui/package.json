@@ -9,5 +9,8 @@
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-native": ">=0.72.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native": { "optional": true }
   }
 }

@@ -7,7 +7,9 @@
     "icon": "./assets/icon.png",
     "scheme": "ascension",
     "userInterfaceStyle": "light",
-    "splash": { "backgroundColor": "#faf9f7" },
+    "splash": {
+      "backgroundColor": "#faf9f7"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.getascension.mobile",
@@ -16,13 +18,16 @@
       }
     },
     "android": {
-      "adaptiveIcon": { "backgroundColor": "#faf9f7" },
+      "adaptiveIcon": {
+        "backgroundColor": "#faf9f7"
+      },
       "package": "app.getascension.mobile"
     },
     "plugins": [
       "expo-router",
       "./plugins/withScreenCapture",
-      "./plugins/withVPNExtension"
+      "./plugins/withVPNExtension",
+      "expo-secure-store"
     ]
   }
 }

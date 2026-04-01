@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -85,14 +85,14 @@ function AuthGate() {
   return <Slot />;
 }
 
-// Use useRef instead of useMemo to avoid React dual-instance issues in monorepo
-const apiInstance = createApiClient({
-  supabaseUrl: config.supabaseUrl,
-  supabaseAnonKey: config.supabaseAnonKey,
-});
-
 export default function RootLayout() {
-  const api = useRef(apiInstance).current;
+  const api = useMemo(
+    () => createApiClient({
+      supabaseUrl: config.supabaseUrl,
+      supabaseAnonKey: config.supabaseAnonKey,
+    }),
+    [],
+  );
 
   return (
     <ApiContext.Provider value={api}>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
@@ -65,15 +65,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Create API client outside component to avoid React dual-instance useMemo issue in monorepo
-const apiInstance = createApiClient({
-  supabaseUrl: config.supabaseUrl,
-  supabaseAnonKey: config.supabaseAnonKey,
-  functionsBaseUrl: config.functionsBaseUrl,
-});
-
 export default function RootLayout() {
-  const api = useRef(apiInstance).current;
+  const api = useMemo(
+    () => createApiClient({
+      supabaseUrl: config.supabaseUrl,
+      supabaseAnonKey: config.supabaseAnonKey,
+      functionsBaseUrl: config.functionsBaseUrl,
+    }),
+    [],
+  );
 
   return (
     <ApiContext.Provider value={api}>
