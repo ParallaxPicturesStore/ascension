@@ -55,26 +55,82 @@ let currentUserId = null;
 let allowQuit = false;
 const isDev = !app.isPackaged;
 
-function getProductionUrl() {
-  // When packaged, __dirname is inside app.asar/main/
-  // The static export is at app.asar/out/index.html
-  // Try multiple candidate paths to handle different packaging layouts
+// Resolve the static export directory (Next.js out/)
+function getOutDir() {
   const candidates = [
-    path.join(__dirname, "../out/index.html"),
-    path.join(app.getAppPath(), "out/index.html"),
-    path.join(app.getAppPath(), "out", "index.html"),
+    path.join(__dirname, "../out"),
+    path.join(app.getAppPath(), "out"),
   ];
-
   for (const candidate of candidates) {
-    crashLog("Checking production path: " + candidate + " exists=" + fs.existsSync(candidate));
     if (fs.existsSync(candidate)) {
-      return `file://${candidate}`;
+      crashLog("Found out dir: " + candidate);
+      return candidate;
     }
   }
+  crashLog("WARNING: No out dir found");
+  return candidates[0];
+}
 
-  // Fallback to the first candidate even if it doesn't exist (will trigger did-fail-load)
-  crashLog("WARNING: No production index.html found, using fallback path");
-  return `file://${candidates[0]}`;
+// Start a simple local HTTP server to serve the Next.js static export
+// This avoids file:// routing issues where /login becomes C:/login
+let localServerPort = 0;
+function startLocalServer() {
+  return new Promise((resolve) => {
+    const http = require("http");
+    const outDir = getOutDir();
+
+    const server = http.createServer((req, res) => {
+      let urlPath = req.url.split("?")[0];
+      if (urlPath === "/") urlPath = "/index.html";
+
+      // Try exact file, then .html, then /index.html
+      const tryPaths = [
+        path.join(outDir, urlPath),
+        path.join(outDir, urlPath + ".html"),
+        path.join(outDir, urlPath, "index.html"),
+      ];
+
+      let filePath = null;
+      for (const candidate of tryPaths) {
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+          filePath = candidate;
+          break;
+        }
+      }
+
+      // Fallback to index.html for client-side routing
+      if (!filePath) {
+        filePath = path.join(outDir, "index.html");
+      }
+
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeTypes = {
+        ".html": "text/html", ".js": "application/javascript", ".css": "text/css",
+        ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg",
+        ".svg": "image/svg+xml", ".ico": "image/x-icon", ".woff": "font/woff",
+        ".woff2": "font/woff2", ".txt": "text/plain",
+      };
+
+      try {
+        const data = fs.readFileSync(filePath);
+        res.writeHead(200, { "Content-Type": mimeTypes[ext] || "application/octet-stream" });
+        res.end(data);
+      } catch (err) {
+        res.writeHead(404);
+        res.end("Not found");
+      }
+    });
+
+    server.listen(0, "127.0.0.1", () => {
+      localServerPort = server.address().port;
+      crashLog("Local server started on port " + localServerPort);
+      resolve(localServerPort);
+    });
+  });
+}
+
+function getProductionUrl() {
+  return `http://127.0.0.1:${localServerPort}/`;
 }
 
 function createWindow() {
@@ -97,8 +153,13 @@ function createWindow() {
     },
   });
 
-  const url = isDev ? "http://localhost:3001" : getProductionUrl();
-  crashLog("Loading URL: " + url);
+  let url;
+  if (isDev && !localServerPort) {
+    url = "http://localhost:3001";
+  } else {
+    url = getProductionUrl();
+  }
+  crashLog("Loading URL: " + url + " (isDev=" + isDev + ", port=" + localServerPort + ")");
 
   // Fallback: if ready-to-show never fires (e.g. page load fails), show window after 5s
   const showFallbackTimer = setTimeout(() => {
@@ -110,13 +171,12 @@ function createWindow() {
 
   mainWindow.loadURL(url);
 
-  if (isDev) {
-    mainWindow.webContents.openDevTools({ mode: "detach" });
-  }
+  // Temporarily enable devtools for debugging white screen
+  mainWindow.webContents.openDevTools({ mode: "detach" });
 
   // SECURITY: Prevent navigation to untrusted origins
   mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
-    const allowed = ["http://localhost:3001", "file://"];
+    const allowed = ["http://localhost:3001", "http://127.0.0.1:", "file://", "app://"];
     if (!allowed.some((a) => navigationUrl.startsWith(a))) {
       event.preventDefault();
       console.warn("[Security] Blocked navigation to:", navigationUrl);
@@ -233,6 +293,15 @@ function onUserLoggedIn(userId) {
 
 app.whenReady().then(async () => {
   crashLog("app.whenReady() fired");
+
+  // Always start local server if out/ directory exists (handles both packaged and unpackaged)
+  const outDir = getOutDir();
+  if (fs.existsSync(path.join(outDir, "index.html"))) {
+    crashLog("Starting local server (out dir found at: " + outDir + ")");
+    await startLocalServer();
+  } else {
+    crashLog("No out/index.html found, using dev server");
+  }
 
   Menu.setApplicationMenu(null);
   crashLog("Step 1/7: Creating window...");
