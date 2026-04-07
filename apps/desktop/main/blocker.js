@@ -680,21 +680,29 @@ async function setupBlocking() {
     getTrancoTop10k(),
   ]);
 
-  // Verify each remote domain through all filter layers
-  let accepted = 0;
-  let rejected = 0;
-  for (const domain of remoteDomains) {
-    if (verifyDomain(domain, trancoSet)) {
-      finalDomains.add(domain);
-      finalDomains.add("www." + domain);
-      accepted++;
-    } else {
-      rejected++;
+  // SAFETY: If Tranco list failed to load and we have no cached version,
+  // only use the curated list. The remote list is too risky without the
+  // Tranco popularity filter - it can block legitimate sites.
+  if (trancoSet.size === 0) {
+    console.warn("[Blocker] WARNING: Tranco safety list is empty - using curated domains ONLY");
+    console.log(`[Blocker] Total domains to block: ${finalDomains.size} (curated only, remote list skipped for safety)`);
+  } else {
+    // Verify each remote domain through all filter layers
+    let accepted = 0;
+    let rejected = 0;
+    for (const domain of remoteDomains) {
+      if (verifyDomain(domain, trancoSet)) {
+        finalDomains.add(domain);
+        finalDomains.add("www." + domain);
+        accepted++;
+      } else {
+        rejected++;
+      }
     }
-  }
 
-  console.log(`[Blocker] Remote domains: ${accepted} accepted, ${rejected} rejected as false positives`);
-  console.log(`[Blocker] Total domains to block: ${finalDomains.size}`);
+    console.log(`[Blocker] Remote domains: ${accepted} accepted, ${rejected} rejected as false positives`);
+    console.log(`[Blocker] Total domains to block: ${finalDomains.size}`);
+  }
 
   const updated = injectBlock(current, [...finalDomains]);
   await writeHostsFile(updated);
