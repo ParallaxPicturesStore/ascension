@@ -1,5 +1,5 @@
 const { ipcMain, app, shell } = require("electron");
-const { getDb, callEdgeFunction, setAccessToken, getAccessToken } = require("./api-client");
+const { getDb, callEdgeFunction, setAccessToken, getAccessToken, setSupabaseConfig } = require("./api-client");
 const { pauseCapture, resumeCapture, getCaptureState } = require("./capture");
 const { sendAlertEmail } = require("./alerts");
 const { getStreak, resetStreak, getWeeklyStats } = require("./streak");
@@ -162,13 +162,18 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
 
   // Notify main process that user has logged in - starts watchdog
   // Also receives the access token for Edge Function calls
-  ipcMain.handle("user:logged-in", (_, userId, accessToken) => {
+  ipcMain.handle("user:logged-in", (_, userId, accessToken, supabaseUrl, supabaseAnonKey) => {
+    console.log(`[IPC] Received login - UserID: ${userId}, HasToken: ${!!accessToken}`);
     // Validate userId is a UUID to prevent injection
     if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
       console.warn("[IPC] Invalid userId rejected");
       return { ok: false, error: "Invalid user ID" };
     }
     currentUserId = userId;
+    // Store Supabase config sent from the renderer (always available there via Next.js build)
+    if (supabaseUrl) {
+      setSupabaseConfig(supabaseUrl, supabaseAnonKey || "");
+    }
     // Store the access token for all Edge Function calls
     if (accessToken) {
       setAccessToken(accessToken);

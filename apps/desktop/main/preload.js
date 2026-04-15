@@ -36,7 +36,8 @@ contextBridge.exposeInMainWorld("ascension", {
   getScreenshotStats: () => ipcRenderer.invoke("screenshots:stats"),
 
   // Notify main process of login (starts watchdog) — pass access token for Edge Function calls
-  notifyLoggedIn: (userId, accessToken) => ipcRenderer.invoke("user:logged-in", userId, accessToken),
+  notifyLoggedIn: (userId, accessToken, supabaseUrl, supabaseAnonKey) =>
+    ipcRenderer.invoke("user:logged-in", userId, accessToken, supabaseUrl, supabaseAnonKey),
 
   // Send updated access token (e.g. after token refresh)
   updateToken: (accessToken) => ipcRenderer.invoke("user:update-token", accessToken),

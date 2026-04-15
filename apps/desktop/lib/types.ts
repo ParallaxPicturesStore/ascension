@@ -153,7 +153,7 @@ declare global {
       pauseCapture: () => Promise<{ status: string }>;
       resumeCapture: () => Promise<{ status: string }>;
       getCaptureStatus: () => Promise<{ status: string }>;
-      notifyLoggedIn: (userId: string) => Promise<{ ok: boolean }>;
+      notifyLoggedIn: (userId: string, accessToken: string, supabaseUrl: string, supabaseAnonKey: string) => Promise<{ ok: boolean }>;
       showWindow: () => Promise<void>;
       hideWindow: () => Promise<void>;
       quitApp: (partnerPassword: string) => Promise<{ success: boolean; error?: string }>;

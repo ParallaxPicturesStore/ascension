@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { getDb, callEdgeFunction, getAccessToken } = require("./api-client");
+const { getDb, getAuthDb, callEdgeFunction, getAccessToken } = require("./api-client");
 const { analyzeImage } = require("./rekognition");
 const { analyzeLocally } = require("./local-analyzer");
 const { isRekognitionEnabled } = require("./subscription");
@@ -18,6 +18,7 @@ let captureTimer = null;
 let captureState = "active";
 let mainWindowRef = null;
 let currentUserId = null;
+let currentUserCache = null;
 
 const tempDir = path.join(os.tmpdir(), "ascension-captures");
 
@@ -42,17 +43,39 @@ async function blurScreenshot(buffer) {
   return sharp(buffer).blur(40).jpeg({ quality: 30 }).toBuffer();
 }
 
+function setCurrentUser(user) {
+  currentUserCache = user;
+  console.log(`[Capture] User cached: ${user?.name} (${user?.id})`);
+}
+
 // Get the current user's info for alert context (anon key — RLS allows own row)
 async function getCurrentUser() {
-  const db = getDb();
-  if (!db || !currentUserId) return null;
+  if (currentUserCache) return currentUserCache;
 
-  const { data } = await db
+  // Use getAuthDb() to bypass RLS for our own record
+  const db = getAuthDb() || getDb();
+  const hasToken = !!getAccessToken();
+
+  console.log(`[Capture] getCurrentUser - ID: ${currentUserId}, AuthDB: ${!!getAuthDb()}, HasToken: ${hasToken}`);
+
+  if (!db || !currentUserId) {
+    console.log("[Capture] Aborting getCurrentUser: DB or ID missing");
+    return null;
+  }
+
+  const { data, error } = await db
     .from("users")
     .select("id, name, email, partner_email, partner_id")
     .eq("id", currentUserId)
     .single();
 
+  if (error) {
+    console.error("[Capture] Profile Fetch Error:", error.message);
+    return null;
+  }
+
+  if (data) currentUserCache = data;
+  console.log("user fetched : ", data);
   return data;
 }
 
@@ -76,7 +99,9 @@ async function captureAndAnalyze() {
     let analysis;
     if (localResult !== null && !localResult.needsVerification) {
       // Locally confirmed clean — skip Rekognition entirely
-      console.log(`[Capture] Local clean (${localResult.localScore}%) — skipping Rekognition`);
+      console.log(
+        `[Capture] Local clean (${localResult.localScore}%) — skipping Rekognition`,
+      );
       analysis = { labels: [], maxConfidence: 0, raw: [] };
     } else if (isRekognitionEnabled()) {
       // Local flagged or model unavailable — verify with Rekognition (within grace period)
@@ -84,9 +109,16 @@ async function captureAndAnalyze() {
     } else {
       // Grace period expired — fall back to local score only
       if (localResult) {
-        console.log(`[Capture] Rekognition offline (grace period ended) — using local score ${localResult.localScore}%`);
+        console.log(
+          `[Capture] Rekognition offline (grace period ended) — using local score ${localResult.localScore}%`,
+        );
         analysis = {
-          labels: localResult.localScore >= 60 ? [`Explicit content detected (local: ${localResult.localScore}%)`] : [],
+          labels:
+            localResult.localScore >= 60
+              ? [
+                `Explicit content detected (local: ${localResult.localScore}%)`,
+              ]
+              : [],
           maxConfidence: localResult.localScore,
           raw: [],
         };
@@ -103,18 +135,24 @@ async function captureAndAnalyze() {
 
     // Log screenshot to Supabase via Edge Function
     if (user && token) {
-      await callEdgeFunction("screenshots.log", {
-        user_id: user.id,
-        timestamp,
-        rekognition_score: maxConfidence,
-        flagged,
-        labels: analysis.labels,
-      }, token).catch((err) => console.error("[Capture] Failed to log screenshot:", err.message));
+      await callEdgeFunction(
+        "screenshots.log",
+        {
+          user_id: user.id,
+          timestamp,
+          rekognition_score: maxConfidence,
+          flagged,
+          labels: analysis.labels,
+        },
+        token,
+      ).catch((err) =>
+        console.error("[Capture] Failed to log screenshot:", err.message),
+      );
     }
 
     if (flagged) {
       console.log(
-        `[Capture] FLAGGED - Confidence: ${maxConfidence}% - Labels: ${analysis.labels.join(", ")}`
+        `[Capture] FLAGGED - Confidence: ${maxConfidence}% - Labels: ${analysis.labels.join(", ")}`,
       );
 
       const blurredBuffer = await blurScreenshot(imgBuffer);
@@ -130,25 +168,37 @@ async function captureAndAnalyze() {
 
       // Create alert in Supabase via Edge Function
       if (user && user.partner_id && token) {
-        await callEdgeFunction("alerts.create", {
-          user_id: user.id,
-          partner_id: user.partner_id,
-          type: "content_detected",
-          message: `Explicit content detected with ${maxConfidence.toFixed(0)}% confidence. Labels: ${analysis.labels.join(", ")}`,
-        }, token).catch((err) => console.error("[Capture] Failed to create alert:", err.message));
+        await callEdgeFunction(
+          "alerts.create",
+          {
+            user_id: user.id,
+            partner_id: user.partner_id,
+            type: "content_detected",
+            message: `Explicit content detected with ${maxConfidence.toFixed(0)}% confidence. Labels: ${analysis.labels.join(", ")}`,
+          },
+          token,
+        ).catch((err) =>
+          console.error("[Capture] Failed to create alert:", err.message),
+        );
       }
 
       // Send email to partner via Edge Function
       if (user?.partner_email && token) {
-        await callEdgeFunction("alerts.sendEmail", {
-          type: "content_detected",
-          to: user.partner_email,
-          userName: user.name,
-          data: {
-            confidence: maxConfidence.toFixed(0),
-            labels: analysis.labels.join(", "),
+        await callEdgeFunction(
+          "alerts.sendEmail",
+          {
+            type: "content_detected",
+            to: user.partner_email,
+            userName: user.name,
+            data: {
+              confidence: maxConfidence.toFixed(0),
+              labels: analysis.labels.join(", "),
+            },
           },
-        }, token).catch((err) => console.error("[Capture] Failed to send alert email:", err.message));
+          token,
+        ).catch((err) =>
+          console.error("[Capture] Failed to send alert email:", err.message),
+        );
       }
 
       // Notify renderer
@@ -175,7 +225,13 @@ async function captureAndAnalyze() {
       }
     }
 
-    return { id, timestamp, flagged, confidence: maxConfidence, labels: analysis.labels };
+    return {
+      id,
+      timestamp,
+      flagged,
+      confidence: maxConfidence,
+      labels: analysis.labels,
+    };
   } catch (err) {
     console.error("[Capture] Error:", err.message);
     return null;
@@ -215,22 +271,34 @@ async function pauseCapture() {
     const token = getAccessToken();
 
     if (user && user.partner_id && token) {
-      await callEdgeFunction("alerts.create", {
-        user_id: user.id,
-        partner_id: user.partner_id,
-        type: "evasion",
-        message: "Monitoring was paused by the user.",
-      }, token);
+      await callEdgeFunction(
+        "alerts.create",
+        {
+          user_id: user.id,
+          partner_id: user.partner_id,
+          type: "evasion",
+          message: "Monitoring was paused by the user.",
+        },
+        token,
+      );
+      console.log("[Capture] Evasion alert sent to partner via Edge Function");
     }
 
-    if (user?.partner_email && token) {
-      await callEdgeFunction("alerts.sendEmail", {
-        type: "evasion",
-        to: user.partner_email,
-        userName: user.name,
-        data: { action: "paused" },
-      }, token);
-    }
+    // if (user?.partner_email && token) {
+    //   await callEdgeFunction(
+    //     "alerts.sendEmail",
+    //     {
+    //       type: "evasion",
+    //       to: user.partner_email,
+    //       userName: user.name,
+    //       data: { action: "paused" },
+    //     },
+    //     token,
+    //   );
+    //   console.log(
+    //     "[Capture] Evasion alert email sent to partner via Edge Function",
+    //   );
+    // }
   } catch (err) {
     console.error("[Capture] Failed to send pause evasion alert:", err.message);
   }
@@ -266,4 +334,5 @@ module.exports = {
   resumeCapture,
   getCaptureState,
   setCurrentUserId,
+  setCurrentUser,
 };

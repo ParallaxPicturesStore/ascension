@@ -40,7 +40,7 @@ try {
 } catch (_) {}
 
 const { createTray } = require("./tray");
-const { startCapture, setCurrentUserId } = require("./capture");
+const { startCapture, setCurrentUserId, setCurrentUser } = require("./capture");
 const { registerIpcHandlers } = require("./ipc");
 const { setupAutoLaunch, setupProtection } = require("./protection");
 const { startDailyStreakUpdate } = require("./streak");
@@ -282,10 +282,27 @@ async function sendEvasionAlert(action) {
   }
 }
 
-function onUserLoggedIn(userId) {
+async function onUserLoggedIn(userId) {
   currentUserId = userId;
   setCurrentUserId(userId);
   spawnWatchdog(userId);
+
+  // Cache user profile so pauseCapture can send alerts without a live DB query
+  try {
+    const { getAuthDb, getDb } = require("./api-client");
+    const db = getAuthDb() || getDb();
+    if (db) {
+      const { data } = await db
+        .from("users")
+        .select("id, name, email, partner_email, partner_id")
+        .eq("id", userId)
+        .single();
+      if (data) setCurrentUser(data);
+    }
+  } catch (err) {
+    console.error("[Main] Failed to cache user profile:", err.message);
+  }
+
   // Check subscription status, grace period, and remote kill switch
   initSubscriptionCheck(userId, mainWindow).catch((err) => {
     console.error("[Main] Subscription check failed:", err.message);

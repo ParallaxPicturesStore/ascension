@@ -73,7 +73,12 @@ export default function Dashboard() {
 
     // Notify Electron main process - starts watchdog
     if (typeof window !== "undefined" && window.ascension?.notifyLoggedIn) {
-      window.ascension.notifyLoggedIn(session.user.id);
+      window.ascension.notifyLoggedIn(
+        session.user.id,
+        session.access_token,
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      );
     }
 
     setUser({
