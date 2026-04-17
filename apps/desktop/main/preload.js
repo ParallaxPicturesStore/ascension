@@ -32,8 +32,10 @@ contextBridge.exposeInMainWorld("ascension", {
   // Billing
   openCheckout: (userId, userEmail, plan) =>
     ipcRenderer.invoke("billing:checkout", { userId, userEmail, plan }),
-  getSubscriptionStatus: (userId) => ipcRenderer.invoke("billing:status", userId),
-  openBillingPortal: (customerId) => ipcRenderer.invoke("billing:portal", customerId),
+  getSubscriptionStatus: (userId) =>
+    ipcRenderer.invoke("billing:status", userId),
+  openBillingPortal: (customerId) =>
+    ipcRenderer.invoke("billing:portal", customerId),
 
   // Screenshot data
   getRecentScreenshots: () => ipcRenderer.invoke("screenshots:recent"),
@@ -41,13 +43,22 @@ contextBridge.exposeInMainWorld("ascension", {
 
   // Notify main process of login (starts watchdog) — pass access token for Edge Function calls
   notifyLoggedIn: (userId, accessToken, supabaseUrl, supabaseAnonKey) =>
-    ipcRenderer.invoke("user:logged-in", userId, accessToken, supabaseUrl, supabaseAnonKey),
+    ipcRenderer.invoke(
+      "user:logged-in",
+      userId,
+      accessToken,
+      supabaseUrl,
+      supabaseAnonKey,
+    ),
 
   // Notify main process of logout — stops capture and clears user state
   notifyLoggedOut: () => ipcRenderer.invoke("user:logged-out"),
 
   // Send updated access token (e.g. after token refresh)
-  updateToken: (accessToken) => ipcRenderer.invoke("user:update-token", accessToken),
+  updateToken: (accessToken) =>
+    ipcRenderer.invoke("user:update-token", accessToken),
+  linkPartner: (userId, partnerEmail) =>
+    ipcRenderer.invoke("user:link-partner", { userId, partnerEmail }),
 
   // Shell
   openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),

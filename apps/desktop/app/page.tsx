@@ -16,6 +16,7 @@ interface UserProfile {
   email: string;
   partner_email: string | null;
   stripe_customer_id: string | null;
+  partner_id: string | null;
   subscription_status: string;
   subscription_lapse_date: string | null;
 }
@@ -107,7 +108,7 @@ export default function Dashboard() {
     // onboarding also have an access token in the main process (needed
     // for sending the partner invite email from the onboarding partner page).
     if (typeof window !== "undefined" && window.ascension?.notifyLoggedIn) {
-      window.ascension.notifyLoggedIn(
+      await window.ascension.notifyLoggedIn(
         session.user.id,
         session.access_token,
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -126,6 +127,7 @@ export default function Dashboard() {
       email: profile.email,
       partner_email: profile.partner_email,
       stripe_customer_id: profile.stripe_customer_id,
+      partner_id: profile.partner_id,
       subscription_status: profile.subscription_status,
       subscription_lapse_date: profile.subscription_lapse_date,
     });
@@ -175,19 +177,21 @@ export default function Dashboard() {
 
   function setupCaptureListener() {
     if (typeof window !== "undefined" && window.ascension) {
-      window.ascension.getCaptureStatus().then((res) => {
+      void window.ascension.getCaptureStatus().then((res) => {
         setCaptureStatus(res.status as typeof captureStatus);
       });
 
-      window.ascension.onCaptureEvent((event) => {
+      return window.ascension.onCaptureEvent((event) => {
         if (event.type === "paused") setCaptureStatus("paused");
         if (event.type === "resumed") setCaptureStatus("active");
         if (event.type === "flagged" || event.type === "immediate_alert") {
           // Refresh data on flag
-          checkAuth();
+          void checkAuth();
         }
       });
     }
+
+    return () => {};
   }
 
   async function toggleCapture() {

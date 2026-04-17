@@ -160,11 +160,32 @@ declare global {
       pauseCapture: () => Promise<{ status: string }>;
       resumeCapture: () => Promise<{ status: string }>;
       getCaptureStatus: () => Promise<{ status: string }>;
-      notifyLoggedIn: (userId: string, accessToken: string, supabaseUrl: string, supabaseAnonKey: string) => Promise<{ ok: boolean }>;
+      notifyLoggedIn: (
+        userId: string,
+        accessToken: string,
+        supabaseUrl: string,
+        supabaseAnonKey: string,
+      ) => Promise<{ ok: boolean }>;
+      updateToken: (
+        accessToken: string,
+      ) => Promise<{ ok: boolean; error?: string }>;
+      linkPartner: (
+        userId: string,
+        partnerEmail: string,
+      ) => Promise<{
+        success: boolean;
+        error?: string;
+        partnerId?: string | null;
+      }>;
       showWindow: () => Promise<void>;
       hideWindow: () => Promise<void>;
-      quitApp: (partnerPassword: string) => Promise<{ success: boolean; error?: string }>;
-      setQuitPassword: (userId: string, password: string) => Promise<{ success: boolean; error?: string }>;
+      quitApp: (
+        partnerPassword: string,
+      ) => Promise<{ success: boolean; error?: string }>;
+      setQuitPassword: (
+        userId: string,
+        password: string,
+      ) => Promise<{ success: boolean; error?: string }>;
       getAppInfo: () => Promise<{
         version: string;
         captureState: string;
@@ -190,7 +211,11 @@ declare global {
         flaggedCount: number;
       }>;
       // Billing
-      openCheckout: (userId: string, userEmail: string, plan: string) => Promise<{ success: boolean; url?: string }>;
+      openCheckout: (
+        userId: string,
+        userEmail: string,
+        plan: string,
+      ) => Promise<{ success: boolean; url?: string }>;
       getSubscriptionStatus: (userId: string) => Promise<string>;
       openBillingPortal: (customerId: string) => Promise<{ success: boolean }>;
       // Screenshots

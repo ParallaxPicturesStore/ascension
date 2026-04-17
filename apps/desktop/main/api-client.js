@@ -49,7 +49,14 @@ function getDb() {
  */
 async function callEdgeFunction(action, payload, accessToken) {
   const baseurl = getSupabaseUrl();
-  const url = `${baseurl.replace(/\/$/, "")}/functions/v1/ascension-api`
+  if (!baseurl) {
+    throw new Error("Supabase URL not configured");
+  }
+  if (!accessToken) {
+    throw new Error("Access token missing");
+  }
+
+  const url = `${baseurl.replace(/\/$/, "")}/functions/v1/ascension-api`;
   const res = await fetch(url, {
     method: "POST",
     headers: {

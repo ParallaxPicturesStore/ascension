@@ -270,9 +270,7 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">
-                Your Goal
-              </label>
+              <label className="block text-xs text-muted mb-1">Your Goal</label>
               <textarea
                 value={goals}
                 onChange={(e) => setGoals(e.target.value)}
@@ -417,9 +415,7 @@ export default function SettingsPage() {
               {quitting ? "..." : "Quit"}
             </button>
           </div>
-          {quitError && (
-            <p className="text-xs text-danger mt-2">{quitError}</p>
-          )}
+          {quitError && <p className="text-xs text-danger mt-2">{quitError}</p>}
         </div>
       </div>
     </div>

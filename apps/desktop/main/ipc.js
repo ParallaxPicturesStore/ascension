@@ -3,7 +3,11 @@ const { getDb, callEdgeFunction, setAccessToken, getAccessToken, setSupabaseConf
 const { pauseCapture, resumeCapture, getCaptureState, stopCapture, clearCurrentUser } = require("./capture");
 const { sendAlertEmail } = require("./alerts");
 const { getStreak, resetStreak, getWeeklyStats } = require("./streak");
-const { createCheckoutSession, getSubscriptionStatus, createCustomerPortalSession } = require("./billing");
+const {
+  createCheckoutSession,
+  getSubscriptionStatus,
+  createCustomerPortalSession,
+} = require("./billing");
 const { hashQuitPassword } = require("./crypto-utils");
 
 let currentUserId = null;
@@ -72,16 +76,23 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
   });
 
   // Alert emails — validate inputs to prevent injection into email HTML
-  ipcMain.handle("alert:send", async (_, { type, partnerEmail, userName, data }) => {
-    if (typeof type !== "string" || typeof partnerEmail !== "string" || typeof userName !== "string") {
-      return { error: "Invalid alert parameters" };
-    }
-    // Basic email format check
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) {
-      return { error: "Invalid email address" };
-    }
-    return await sendAlertEmail(type, partnerEmail, userName, data);
-  });
+  ipcMain.handle(
+    "alert:send",
+    async (_, { type, partnerEmail, userName, data }) => {
+      if (
+        typeof type !== "string" ||
+        typeof partnerEmail !== "string" ||
+        typeof userName !== "string"
+      ) {
+        return { error: "Invalid alert parameters" };
+      }
+      // Basic email format check
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) {
+        return { error: "Invalid email address" };
+      }
+      return await sendAlertEmail(type, partnerEmail, userName, data);
+    },
+  );
 
   ipcMain.handle("alert:invite-partner", async (_, {
     partnerEmail,
@@ -158,7 +169,8 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
   });
 
   ipcMain.handle("screenshots:stats", async () => {
-    if (!currentUserId) return { totalCaptures: 0, flaggedCount: 0, lastCaptureTime: null };
+    if (!currentUserId)
+      return { totalCaptures: 0, flaggedCount: 0, lastCaptureTime: null };
     const db = getDb();
     const [total, flaggedCount, lastCapture] = await Promise.all([
       db
@@ -186,25 +198,35 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
 
   // Notify main process that user has logged in - starts watchdog
   // Also receives the access token for Edge Function calls
-  ipcMain.handle("user:logged-in", (_, userId, accessToken, supabaseUrl, supabaseAnonKey) => {
-    console.log(`[IPC] Received login - UserID: ${userId}, HasToken: ${!!accessToken}`);
-    // Validate userId is a UUID to prevent injection
-    if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
-      console.warn("[IPC] Invalid userId rejected");
-      return { ok: false, error: "Invalid user ID" };
-    }
-    currentUserId = userId;
-    // Store Supabase config sent from the renderer (always available there via Next.js build)
-    if (supabaseUrl) {
-      setSupabaseConfig(supabaseUrl, supabaseAnonKey || "");
-    }
-    // Store the access token for all Edge Function calls
-    if (accessToken) {
-      setAccessToken(accessToken);
-    }
-    if (onUserLoggedIn) onUserLoggedIn(userId);
-    return { ok: true };
-  });
+  ipcMain.handle(
+    "user:logged-in",
+    (_, userId, accessToken, supabaseUrl, supabaseAnonKey) => {
+      console.log(
+        `[IPC] Received login - UserID: ${userId}, HasToken: ${!!accessToken}`,
+      );
+      // Validate userId is a UUID to prevent injection
+      if (
+        typeof userId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          userId,
+        )
+      ) {
+        console.warn("[IPC] Invalid userId rejected");
+        return { ok: false, error: "Invalid user ID" };
+      }
+      currentUserId = userId;
+      // Store Supabase config sent from the renderer (always available there via Next.js build)
+      if (supabaseUrl) {
+        setSupabaseConfig(supabaseUrl, supabaseAnonKey || "");
+      }
+      // Store the access token for all Edge Function calls
+      if (accessToken) {
+        setAccessToken(accessToken);
+      }
+      if (onUserLoggedIn) onUserLoggedIn(userId);
+      return { ok: true };
+    },
+  );
 
   // Notify main process that user has logged out — stop capture and clear user state
   ipcMain.handle("user:logged-out", () => {
@@ -217,20 +239,68 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
 
   // Receive updated access token (e.g. after refresh)
   ipcMain.handle("user:update-token", (_, accessToken) => {
-    if (typeof accessToken === "string" && accessToken.length > 0) {
-      setAccessToken(accessToken);
+    if (typeof accessToken === "string") {
+      setAccessToken(accessToken || null);
       return { ok: true };
     }
     return { ok: false, error: "Invalid token" };
   });
 
+  // Link the current user to a partner account via Edge Function
+  ipcMain.handle("user:link-partner", async (_, { userId, partnerEmail }) => {
+    if (
+      typeof userId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        userId,
+      )
+    ) {
+      return { success: false, error: "Invalid user ID" };
+    }
+    if (
+      typeof partnerEmail !== "string" ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)
+    ) {
+      return { success: false, error: "Invalid partner email" };
+    }
+    if (userId !== currentUserId) {
+      return { success: false, error: "Cannot link partner for another user" };
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      return { success: false, error: "No access token" };
+    }
+
+    try {
+      const result = await callEdgeFunction(
+        "users.linkPartner",
+        {
+          user_id: userId,
+          partner_email: partnerEmail.trim().toLowerCase(),
+        },
+        token,
+      );
+      return { success: true, partnerId: result.partner_id || null };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
   // Set the quit password (hashed and stored via Edge Function)
   ipcMain.handle("user:set-quit-password", async (_, { userId, password }) => {
     if (typeof password !== "string" || password.length < 4) {
-      return { success: false, error: "Password must be at least 4 characters" };
+      return {
+        success: false,
+        error: "Password must be at least 4 characters",
+      };
     }
     // Validate userId is a UUID
-    if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    if (
+      typeof userId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        userId,
+      )
+    ) {
       return { success: false, error: "Invalid user ID" };
     }
     // Only allow setting password for the currently logged-in user
@@ -243,10 +313,14 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
       return { success: false, error: "No access token" };
     }
     try {
-      await callEdgeFunction("user.setQuitPassword", {
-        user_id: userId,
-        password_hash: hash,
-      }, token);
+      await callEdgeFunction(
+        "user.setQuitPassword",
+        {
+          user_id: userId,
+          password_hash: hash,
+        },
+        token,
+      );
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
