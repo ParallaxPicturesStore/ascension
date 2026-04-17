@@ -113,23 +113,28 @@ async function uploadScreenshotToStorage(userId, timestamp, buffer) {
 
 // Get the current user's info for alert context (anon key — RLS allows own row)
 async function getCurrentUser() {
-  if (cachedUser && cachedUser.id === currentUserId) {
-    return cachedUser;
+  if (currentUserCache) return currentUserCache;
+
+  // Use getAuthDb() to bypass RLS for our own record
+  const db = getAuthDb() || getDb();
+  const hasToken = !!getAccessToken();
+
+  console.log(`[Capture] getCurrentUser - ID: ${currentUserId}, AuthDB: ${!!getAuthDb()}, HasToken: ${hasToken}`);
+
+  if (!db || !currentUserId) {
+    console.log("[Capture] Aborting getCurrentUser: DB or ID missing"); return null;
   }
-
-  const db = getDb();
-  if (!db || !currentUserId) return null;
-
-  const { data } = await db
+  const { data,error } = await db
     .from("users")
     .select("id, name, email, partner_email, partner_id")
     .eq("id", currentUserId)
     .single();
 
-  if (data) {
-    cachedUser = data;
+   if (error) {
+    console.error("[Capture] Failed to fetch current user:", error.message);
+    return null;
   }
-
+if(data)currentUserCache = data;
   return data;
 }
 
