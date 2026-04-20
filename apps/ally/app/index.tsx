@@ -21,7 +21,16 @@ import { formatRelativeTime } from '@ascension/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
 import { useApi } from '../src/hooks/useApi';
+import { config } from '../src/config';
 import type { Screenshot } from '@ascension/api';
+
+function getScreenshotUri(filePath: string | null | undefined): string | null {
+  if (!filePath) return null;
+  // Already a full URL (e.g. older records stored the full public URL)
+  if (filePath.startsWith('http')) return filePath;
+  // Storage path — construct the public URL
+  return `${config.supabaseUrl}/storage/v1/object/public/${filePath}`;
+}
 
 type FilterMode = 'all' | 'flagged';
 
@@ -41,7 +50,9 @@ export default function HomeScreen() {
     if (!partner) return;
     setScreenshotsLoading(true);
     try {
-      const recent = await api.screenshots.getRecent(partner.id, 50);
+      const recent = await api.screenshots.getRecent(partner.id, 500);
+      console.log(recent);
+      
       setScreenshots(recent);
     } catch {
       // Silently handle - partner data may still be available
@@ -73,11 +84,12 @@ export default function HomeScreen() {
   const partnerName = partner?.name ?? 'Your partner';
 
   const renderScreenshotItem = useCallback(({ item }: { item: Screenshot }) => {
+    const imageUri = getScreenshotUri(item.file_path);
     return (
       <Card style={styles.feedItem}>
-        {item.file_path ? (
+        {imageUri ? (
           <BlurredImage
-            source={{ uri: item.file_path }}
+            source={{ uri: imageUri }}
             blurRadius={30}
             style={styles.thumbnail}
           />

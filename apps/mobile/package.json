@@ -5,8 +5,8 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios"
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@ascension/api": "*",
@@ -14,6 +14,7 @@
     "@ascension/shared": "*",
     "@ascension/ui": "*",
     "expo": "~53.0.0",
+    "expo-image-manipulator": "^55.0.15",
     "expo-linking": "~7.1.7",
     "expo-notifications": "~0.31.5",
     "expo-router": "~5.1.11",
@@ -22,7 +23,7 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.6",
-    "react-native-safe-area-context": "5.4.0",
+"react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-web": "^0.20.0"
   },

@@ -1,13 +1,12 @@
 /**
  * AntiTamper - Heartbeat and tamper detection for the monitoring service.
  *
- * - Sends a heartbeat to the API every 2 minutes
- * - If the app is force-stopped or uninstalled, the server-side heartbeat
- *   checker (Supabase Edge Function) will notice the gap and alert the partner
- * - Detects if monitoring was manually stopped and reports evasion
+ * - Sends a heartbeat to ascension-api every 2 minutes with status "online"
+ * - Sends "going_offline" before intentional stops (logout, explicit stop)
+ * - If the app is force-stopped/uninstalled, heartbeats simply stop arriving;
+ *   the server-side cron (monitoring.checkEvasion) notices the gap and alerts
+ * - Detects if monitoring permissions are revoked and reports evasion directly
  */
-import { AlertType } from '@ascension/shared';
-import type { NSFWScores, NSFWCategory } from './ContentAnalyzer';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,14 +14,49 @@ import type { NSFWScores, NSFWCategory } from './ContentAnalyzer';
 
 export interface FlagReport {
   userId: string;
+  userAccessToken: string;
   supabaseUrl: string;
-  supabaseKey: string;
+  supabaseAnonKey: string;
   base64: string;
   timestamp: number;
-  scores: NSFWScores;
-  topCategory: NSFWCategory;
+  labels: string[];
+  topCategory: string;
   topScore: number;
   isAlert: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Shared fetch helper for ascension-api
+// ---------------------------------------------------------------------------
+
+async function callApi(
+  supabaseUrl: string,
+  userAccessToken: string,
+  supabaseAnonKey: string,
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const url = `${supabaseUrl}/functions/v1/ascension-api`;
+
+  console.log(`[AntiTamper] → ${action}`, JSON.stringify(payload));
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${userAccessToken}`,
+      apikey: supabaseAnonKey,
+    },
+    body: JSON.stringify({ action, payload }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    console.error(`[AntiTamper] ✗ ${action} failed (${res.status}):`, text);
+    throw new Error(`${action} failed: ${res.status} ${text}`);
+  }
+
+  console.log(`[AntiTamper] ✓ ${action} OK (${res.status})`);
 }
 
 // ---------------------------------------------------------------------------
@@ -30,62 +64,51 @@ export interface FlagReport {
 // ---------------------------------------------------------------------------
 
 /**
- * Send a heartbeat to the Supabase Edge Function.
- * The server records the timestamp; if no heartbeat arrives within the
- * expected window, it triggers an evasion alert to the partner.
+ * Send a heartbeat to ascension-api.
+ *
+ * status "online"        → app is actively monitoring
+ * status "going_offline" → last ping before intentional silence
+ *                          (send this before any deliberate stop so the
+ *                           server-side evasion check doesn't false-alert)
  */
 export async function sendHeartbeat(
   userId: string,
   supabaseUrl: string,
-  supabaseKey: string
+  userAccessToken: string,
+  supabaseAnonKey: string,
+  status: 'online' | 'going_offline' = 'online',
+  platform: 'android' | 'ios' = 'android',
 ): Promise<void> {
-  const url = `${supabaseUrl}/functions/v1/monitoring-heartbeat`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${supabaseKey}`,
-      apikey: supabaseKey,
-    },
-    body: JSON.stringify({
-      user_id: userId,
-      timestamp: new Date().toISOString(),
-      platform: 'android',
-      status: 'active',
-    }),
+  console.log(`[AntiTamper] Heartbeat [${status}] user=${userId} platform=${platform}`);
+  await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'monitoring.heartbeat', {
+    user_id: userId,
+    status,
+    platform,
   });
-
-  if (!response.ok) {
-    throw new Error(`Heartbeat failed: ${response.status} ${response.statusText}`);
-  }
 }
+
+// ---------------------------------------------------------------------------
+// Evasion reporting
+// ---------------------------------------------------------------------------
 
 /**
  * Report an evasion event (monitoring was tampered with).
+ * Called when the app detects permissions have been revoked or the
+ * accessibility/capture service was killed while the device is online.
  */
 export async function reportEvasion(
   userId: string,
   supabaseUrl: string,
-  supabaseKey: string,
-  reason: string
+  userAccessToken: string,
+  supabaseAnonKey: string,
+  reason: string,
+  platform: 'android' | 'ios' = 'android',
 ): Promise<void> {
-  const url = `${supabaseUrl}/functions/v1/report-evasion`;
-
-  await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${supabaseKey}`,
-      apikey: supabaseKey,
-    },
-    body: JSON.stringify({
-      user_id: userId,
-      timestamp: new Date().toISOString(),
-      platform: 'android',
-      reason,
-      alert_type: AlertType.Evasion,
-    }),
+  console.warn(`[AntiTamper] EVASION DETECTED user=${userId} platform=${platform} reason=${reason}`);
+  await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'monitoring.reportEvasion', {
+    user_id: userId,
+    reason,
+    platform,
   });
 }
 
@@ -102,91 +125,118 @@ export async function reportEvasion(
 export async function reportFlag(report: FlagReport): Promise<void> {
   const {
     userId,
+    userAccessToken,
     supabaseUrl,
-    supabaseKey,
+    supabaseAnonKey,
     base64,
     timestamp,
-    scores,
+    labels,
     topCategory,
     topScore,
     isAlert,
   } = report;
 
-  // 1. Upload screenshot record
-  const screenshotUrl = `${supabaseUrl}/rest/v1/screenshots`;
-  const screenshotResponse = await fetch(screenshotUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${supabaseKey}`,
-      apikey: supabaseKey,
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify({
-      user_id: userId,
-      timestamp: new Date(timestamp).toISOString(),
-      rekognition_score: topScore,
-      flagged: true,
-      reviewed: false,
-      labels: [topCategory, ...Object.entries(scores)
-        .filter(([k, v]) => v > 10 && k !== topCategory)
-        .map(([k]) => k)],
-    }),
-  });
+  console.warn(
+    `[AntiTamper] FLAG RAISED user=${userId}`,
+    `category=${topCategory} score=${Math.round(topScore)}%`,
+    `alert=${isAlert} labels=${labels.join(', ')}`,
+  );
 
-  if (!screenshotResponse.ok) {
-    console.error(
-      '[AntiTamper] Failed to upload screenshot:',
-      screenshotResponse.status
-    );
-    return;
+  // 1. Fetch profile early so partner_id is available for the screenshot log
+  let partnerId: string | null = null;
+  let partnerEmail: string | null = null;
+  let userName = 'User';
+  const profileUrl = `${supabaseUrl}/rest/v1/users?id=eq.${userId}&select=name,partner_id,partner_email`;
+  const profileRes = await fetch(profileUrl, {
+    headers: {
+      Authorization: `Bearer ${userAccessToken}`,
+      apikey: supabaseAnonKey,
+      Accept: 'application/json',
+    },
+  });
+  if (profileRes.ok) {
+    const rows: Array<{ name: string | null; partner_id: string | null; partner_email: string | null }> = await profileRes.json();
+    partnerId = rows[0]?.partner_id ?? null;
+    partnerEmail = rows[0]?.partner_email ?? null;
+    userName = rows[0]?.name ?? 'User';
+  } else {
+    console.warn('[AntiTamper] Failed to fetch user profile:', profileRes.status);
   }
 
-  // 2. If alert-level, upload the image to storage for partner review
+  // 2. If alert-level, upload the image to storage first so we have the path for the log
+  let screenshotStoragePath: string | null = null;
   if (isAlert) {
     try {
-      const storagePath = `screenshots/${userId}/${timestamp}.jpg`;
-      const storageUrl = `${supabaseUrl}/storage/v1/object/${storagePath}`;
+      screenshotStoragePath = `screenshots/${userId}/${timestamp}.jpg`;
+      const storageUrl = `${supabaseUrl}/storage/v1/object/${screenshotStoragePath}`;
+      console.log('[AntiTamper] Uploading screenshot image to storage:', screenshotStoragePath);
 
-      // Convert base64 to binary for upload
       const binaryStr = atob(base64);
       const bytes = new Uint8Array(binaryStr.length);
       for (let i = 0; i < binaryStr.length; i++) {
         bytes[i] = binaryStr.charCodeAt(i);
       }
 
-      await fetch(storageUrl, {
+      const storageRes = await fetch(storageUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'image/jpeg',
-          Authorization: `Bearer ${supabaseKey}`,
-          apikey: supabaseKey,
+          Authorization: `Bearer ${userAccessToken}`,
+          apikey: supabaseAnonKey,
         },
         body: bytes,
       });
+
+      if (storageRes.ok) {
+        console.log('[AntiTamper] ✓ Image uploaded to storage');
+      } else {
+        console.warn('[AntiTamper] Storage upload returned', storageRes.status);
+        screenshotStoragePath = null;
+      }
     } catch (err) {
       console.warn('[AntiTamper] Failed to upload image to storage:', err);
-      // Non-fatal: the screenshot record was still created
+      screenshotStoragePath = null;
     }
   }
 
-  // 3. If alert-level, create an alert for the partner
-  if (isAlert) {
-    const alertUrl = `${supabaseUrl}/rest/v1/rpc/create_content_alert`;
+  // 2. Log screenshot via ascension-api
+  console.log('[AntiTamper] Logging screenshot record...');
+  await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'screenshots.log', {
+    user_id: userId,
+    timestamp: new Date(timestamp).toISOString(),
+    rekognition_score: topScore,
+    flagged: true,
+    labels: labels.length > 0 ? labels : [topCategory],
+    ...(screenshotStoragePath && { file_path: screenshotStoragePath }),
+  });
 
-    await fetch(alertUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseKey}`,
-        apikey: supabaseKey,
-      },
-      body: JSON.stringify({
-        p_user_id: userId,
-        p_type: AlertType.ContentDetected,
-        p_message: `NSFW content detected (${topCategory}: ${Math.round(topScore)}%)`,
-        p_timestamp: new Date(timestamp).toISOString(),
-      }),
-    });
+  // 3. If alert-level, create an alert + send email to partner
+  if (isAlert) {
+    if (partnerId) {
+      console.log('[AntiTamper] Creating partner alert for partner_id:', partnerId);
+      await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'alerts.create', {
+        user_id: userId,
+        partner_id: partnerId,
+        type: 'content_detected',
+        message: `NSFW content detected (${topCategory}: ${Math.round(topScore)}%)`,
+      });
+    } else {
+      console.log('[AntiTamper] No partner linked — skipping alert');
+    }
+
+    if (partnerEmail) {
+      console.log('[AntiTamper] Sending alert email to partner:', partnerEmail);
+      await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'alerts.sendEmail', {
+        type: 'content_detected',
+        to: partnerEmail,
+        userName,
+        data: {
+          confidence: Math.round(topScore).toString(),
+          labels: labels.join(', '),
+        },
+      });
+    } else {
+      console.log('[AntiTamper] No partner email — skipping email');
+    }
   }
 }

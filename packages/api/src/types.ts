@@ -67,6 +67,7 @@ export interface ScreenshotLog {
   rekognition_score: number;
   flagged: boolean;
   labels: string[] | null;
+  file_path?: string | null;
 }
 
 export interface ScreenshotStats {
@@ -173,9 +174,21 @@ export interface CreateEncouragement {
 
 // ── API Client Config ─────────────────────────────────────────
 
+export interface StorageAdapter {
+  getItem(key: string): Promise<string | null> | string | null;
+  setItem(key: string, value: string): Promise<void> | void;
+  removeItem(key: string): Promise<void> | void;
+}
+
 export interface AscensionApiConfig {
   supabaseUrl: string;
   supabaseAnonKey: string;
   /** Base URL for Edge Functions (defaults to supabaseUrl + '/functions/v1') */
   functionsBaseUrl?: string;
+  /**
+   * Custom storage adapter for persisting the auth session.
+   * Pass an AsyncStorage or SecureStore-backed adapter on React Native
+   * so the session survives app restarts.
+   */
+  storage?: StorageAdapter;
 }

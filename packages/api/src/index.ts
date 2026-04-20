@@ -2,6 +2,7 @@ export { createApiClient } from './client';
 export type { AscensionAPI } from './client';
 export type {
   AscensionApiConfig,
+  StorageAdapter,
   AuthResult,
   Session,
   UserProfile,

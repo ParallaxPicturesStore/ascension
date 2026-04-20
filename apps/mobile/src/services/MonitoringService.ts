@@ -2,12 +2,19 @@
  * MonitoringService - Orchestrates the screen capture + analysis pipeline.
  *
  * Flow:
- *   1. Start screen capture (native module)
- *   2. Listen for captured screenshots
- *   3. Run on-device NSFW analysis
- *   4. If flagged: upload screenshot + create alert via API
- *   5. Report heartbeat to API
+ *   1. Start native screen capture (Android only)
+ *   2. Listen for captured screenshots → run cloud NSFW analysis (Rekognition)
+ *   3. If flagged → upload screenshot + create alert via ascension-api
+ *   4. Send "online" heartbeat every 2 minutes so the server knows the
+ *      app is alive. On intentional stop, send "going_offline" first.
+ *   5. Emit detections to any registered callbacks (e.g. for in-app alerts)
+ *
+ * Platform notes:
+ *   Android - screen capture via MediaProjection + cloud NSFW analysis
+ *   iOS     - VPN/DNS filtering is handled natively by the network extension;
+ *             this service only runs the heartbeat loop on iOS
  */
+import { Platform } from 'react-native';
 import {
   startCapture,
   stopCapture,
@@ -28,7 +35,7 @@ import { sendHeartbeat, reportFlag } from './AntiTamper';
 // ---------------------------------------------------------------------------
 
 export interface MonitoringState {
-  status: CaptureStatus;
+  status: CaptureStatus | 'inactive';
   lastScreenshot: number | null;
   lastAnalysis: AnalysisResult | null;
   screenshotsAnalyzed: number;
@@ -36,7 +43,7 @@ export interface MonitoringState {
 }
 
 // ---------------------------------------------------------------------------
-// State
+// Module-level state
 // ---------------------------------------------------------------------------
 
 let state: MonitoringState = {
@@ -50,7 +57,37 @@ let state: MonitoringState = {
 let unsubscribeCapture: (() => void) | null = null;
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
+// Credentials stored at module level for heartbeat and analysis closures
+let _userId = '';
+let _supabaseUrl = '';
+let _userAccessToken = '';
+let _supabaseAnonKey = '';
+let _platform: 'android' | 'ios' = 'android';
+
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+// ---------------------------------------------------------------------------
+// Detection callbacks
+// ---------------------------------------------------------------------------
+
+type DetectionCallback = (result: AnalysisResult) => void;
+const detectionCallbacks: Set<DetectionCallback> = new Set();
+
+/**
+ * Subscribe to NSFW detection events.
+ *
+ * The callback is invoked every time a flagged screenshot is analysed,
+ * including alert-level detections. Returns an unsubscribe function.
+ *
+ * @example
+ *   const unsub = onDetection((result) => showAlert(result));
+ *   // later:
+ *   unsub();
+ */
+export function onDetection(callback: DetectionCallback): () => void {
+  detectionCallbacks.add(callback);
+  return () => detectionCallbacks.delete(callback);
+}
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -59,43 +96,69 @@ const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 /**
  * Initialise and start the monitoring pipeline.
  *
- * @param userId - Authenticated user's ID (for API calls)
- * @param supabaseUrl - Supabase project URL
- * @param supabaseKey - Supabase anon key
+ * @param userId           - Authenticated user's ID
+ * @param supabaseUrl      - Supabase project URL
+ * @param userAccessToken  - User's JWT (from supabase.auth.getSession)
+ * @param supabaseAnonKey  - Project anon key (for apikey header)
  */
 export async function startMonitoring(
   userId: string,
   supabaseUrl: string,
-  supabaseKey: string
+  userAccessToken: string,
+  supabaseAnonKey: string,
 ): Promise<void> {
-  // Load TFLite model
-  await loadModel();
+  // Store for heartbeat / analysis closures
+  _userId = userId;
+  _supabaseUrl = supabaseUrl;
+  _userAccessToken = userAccessToken;
+  _supabaseAnonKey = supabaseAnonKey;
+  _platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
-  // Start native screen capture
-  await startCapture();
+  // Android-only: load model (no-op for API-based analyzer) and start capture
+  if (Platform.OS === 'android') {
+    console.log('[MonitoringService] Loading model...');
+    await loadModel();
 
-  // Listen for screenshots
-  unsubscribeCapture = onScreenshotCaptured((event) => {
-    handleScreenshot(event, userId, supabaseUrl, supabaseKey);
-  });
+    console.log('[MonitoringService] Requesting screen capture permission...');
+    await startCapture();
+    console.log('[MonitoringService] Screen capture started — listening for screenshots');
 
-  // Start heartbeat
+    unsubscribeCapture = onScreenshotCaptured((event) => {
+      console.log(`[MonitoringService] Screenshot received ts=${event.timestamp} size=${event.base64.length}B`);
+      handleScreenshot(event);
+    });
+  }
+
+  // Start heartbeat loop (both platforms)
   heartbeatInterval = setInterval(() => {
-    sendHeartbeat(userId, supabaseUrl, supabaseKey).catch((err) =>
-      console.warn('[MonitoringService] Heartbeat failed:', err)
-    );
+    sendHeartbeat(_userId, _supabaseUrl, _userAccessToken, _supabaseAnonKey, 'online', _platform)
+      .catch((err) => console.warn('[MonitoringService] Heartbeat failed:', err));
   }, HEARTBEAT_INTERVAL_MS);
 
-  // Send an initial heartbeat immediately
-  sendHeartbeat(userId, supabaseUrl, supabaseKey).catch(() => {});
+  // Send an initial "online" heartbeat immediately
+  sendHeartbeat(userId, supabaseUrl, userAccessToken, supabaseAnonKey, 'online', _platform)
+    .catch(() => {});
 
-  state.status = 'active';
+  state.status = Platform.OS === 'android' ? 'active' : 'inactive';
+  console.log(`[MonitoringService] Started — platform=${_platform} status=${state.status}`);
 }
 
 /**
- * Stop the monitoring pipeline and release all resources.
+ * Stop the monitoring pipeline.
+ *
+ * Sends a "going_offline" heartbeat first so the server knows this
+ * silence is intentional and does NOT trigger an evasion alert.
  */
 export async function stopMonitoring(): Promise<void> {
+  // Tell the server this stop is intentional before cutting the connection
+  if (_userId && _supabaseUrl && _userAccessToken) {
+    await sendHeartbeat(
+      _userId, _supabaseUrl, _userAccessToken, _supabaseAnonKey,
+      'going_offline', _platform,
+    ).catch(() => {}); // best-effort
+  }
+
+  // Tear down capture listener
   unsubscribeCapture?.();
   unsubscribeCapture = null;
 
@@ -104,10 +167,25 @@ export async function stopMonitoring(): Promise<void> {
     heartbeatInterval = null;
   }
 
-  await stopCapture();
-  unloadModel();
+  if (Platform.OS === 'android') {
+    await stopCapture();
+    unloadModel();
+  }
 
-  state.status = 'inactive';
+  state = {
+    status: 'inactive',
+    lastScreenshot: null,
+    lastAnalysis: null,
+    screenshotsAnalyzed: 0,
+    flagsRaised: 0,
+  };
+}
+
+/**
+ * Update the user's access token (call this after a token refresh).
+ */
+export function updateAccessToken(newToken: string): void {
+  _userAccessToken = newToken;
 }
 
 /**
@@ -118,36 +196,56 @@ export function getMonitoringState(): MonitoringState {
 }
 
 // ---------------------------------------------------------------------------
-// Screenshot handling
+// Screenshot handling (Android only)
 // ---------------------------------------------------------------------------
 
-async function handleScreenshot(
-  event: ScreenshotEvent,
-  userId: string,
-  supabaseUrl: string,
-  supabaseKey: string
-): Promise<void> {
+async function handleScreenshot(event: ScreenshotEvent): Promise<void> {
   state.lastScreenshot = event.timestamp;
+  const n = state.screenshotsAnalyzed + 1;
+  console.log(`[MonitoringService] Analysing screenshot #${n}...`);
 
   try {
-    const result = await analyzeImage(event.base64);
+    const result = await analyzeImage(event.base64, {
+      supabaseUrl: _supabaseUrl,
+      userAccessToken: _userAccessToken,
+      supabaseAnonKey: _supabaseAnonKey,
+      userId: _userId,
+    });
+
     state.lastAnalysis = result;
     state.screenshotsAnalyzed++;
 
     if (result.flagged) {
+      console.warn(
+        `[MonitoringService] FLAGGED #${n} — category=${result.topCategory}`,
+        `score=${Math.round(result.topScore)}% alert=${result.alert}`,
+        `labels=${result.labels.join(', ')}`,
+      );
       state.flagsRaised++;
 
+      // Notify in-app subscribers (e.g. for UI alert modals)
+      detectionCallbacks.forEach((cb) => {
+        try { cb(result); } catch { /* ignore callback errors */ }
+      });
+
+      // Report to the server and alert partner if alert-level
       await reportFlag({
-        userId,
-        supabaseUrl,
-        supabaseKey,
+        userId: _userId,
+        userAccessToken: _userAccessToken,
+        supabaseUrl: _supabaseUrl,
+        supabaseAnonKey: _supabaseAnonKey,
         base64: event.base64,
         timestamp: event.timestamp,
-        scores: result.scores,
+        labels: result.labels.length > 0 ? result.labels : [result.topCategory],
         topCategory: result.topCategory,
         topScore: result.topScore,
         isAlert: result.alert,
       });
+    } else {
+      console.log(
+        `[MonitoringService] Clean #${n} — category=${result.topCategory}`,
+        `score=${Math.round(result.topScore)}%`,
+      );
     }
   } catch (err) {
     console.error('[MonitoringService] Analysis failed:', err);
