@@ -2,7 +2,7 @@
  * Streak module — reads use anon key (RLS), writes use Edge Function.
  */
 
-const { getDb, callEdgeFunction, getAccessToken } = require("./api-client");
+const { getDb, getAuthDb, callEdgeFunction, getAccessToken } = require("./api-client");
 
 async function getStreak(userId) {
   const db = getDb();
@@ -104,7 +104,7 @@ async function updateAllStreaks() {
 }
 
 async function getWeeklyStats(userId) {
-  const db = getDb();
+  const db = getAuthDb() || getDb();
   if (!db) return { screenshotCount: 0, blockedCount: 0, flaggedCount: 0 };
 
   const weekAgo = new Date();
@@ -128,6 +128,14 @@ async function getWeeklyStats(userId) {
       .eq("flagged", true)
       .gte("timestamp", weekAgo.toISOString()),
   ]);
+
+  if (screenshots.error || blocked.error || alerts.error) {
+    console.error("[Streak] Error fetching weekly stats:", {
+      screenshots: screenshots.error?.message,
+      blocked: blocked.error?.message,
+      alerts: alerts.error?.message,
+    });
+  }
 
   return {
     screenshotCount: screenshots.count || 0,

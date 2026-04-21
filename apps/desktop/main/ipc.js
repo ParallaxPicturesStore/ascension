@@ -140,23 +140,27 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
   ipcMain.handle("screenshots:stats", async () => {
     if (!currentUserId) return { totalCaptures: 0, flaggedCount: 0, lastCaptureTime: null };
     const db = getDb();
-    const [total, flagged] = await Promise.all([
+    const [total, flaggedCount, lastCapture] = await Promise.all([
       db
         .from("screenshots")
         .select("id", { count: "exact", head: true })
         .eq("user_id", currentUserId),
       db
         .from("screenshots")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", currentUserId)
+        .eq("flagged", true),
+      db
+        .from("screenshots")
         .select("timestamp")
         .eq("user_id", currentUserId)
-        .eq("flagged", true)
         .order("timestamp", { ascending: false })
         .limit(1),
     ]);
     return {
       totalCaptures: total.count || 0,
-      flaggedCount: flagged.data?.length || 0,
-      lastCaptureTime: flagged.data?.[0]?.timestamp || null,
+      flaggedCount: flaggedCount.count || 0,
+      lastCaptureTime: lastCapture.data?.[0]?.timestamp || null,
     };
   });
 
