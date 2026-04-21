@@ -40,8 +40,8 @@ export default function SignupPage() {
       return;
     }
 
-    // Supabase trigger creates user record and streak automatically
-    router.push("/onboarding");
+    // New users should sign in first; dashboard auth check sends incomplete profiles into onboarding.
+    router.replace("/login");
   }
 
   return (

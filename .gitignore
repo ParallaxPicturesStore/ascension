@@ -12,6 +12,7 @@ out/
 # Environment — NEVER commit files containing secrets
 !.env.example
 .env.*.local
+.env.local
 
 # OS
 .DS_Store
