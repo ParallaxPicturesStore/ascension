@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, RefreshControl, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ScreenLayout,
@@ -11,9 +11,11 @@ import {
   Button,
   theme,
 } from '@ascension/ui';
-import type { Alert, Streak, ScreenshotStats, WeeklyStats } from '../src/hooks/useApi';
+import type { Alert, Streak, ScreenshotStats, WeeklyStats } from '@ascension/api';
+import { calculateStreak } from '@ascension/shared';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
+import { vpnManager } from '../src/native/VPNManager';
 
 export default function DashboardScreen() {
   const api = useApi();
@@ -27,6 +29,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [vpnStatus, setVpnStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'error'>('disconnected');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -55,13 +58,23 @@ export default function DashboardScreen() {
     loadData();
   }, [loadData]);
 
+  // Poll VPN status on iOS every 5 seconds while screen is mounted
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    vpnManager.getVPNStatus().then(setVpnStatus);
+    const t = setInterval(() => vpnManager.getVPNStatus().then(setVpnStatus), 5000);
+    return () => clearInterval(t);
+  }, []);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
   }, [loadData]);
 
-  const monitoringActive = true; // Desktop is responsible for monitoring
+  const monitoringActive = Platform.OS === 'ios'
+    ? vpnStatus === 'connected'
+    : true; // Android monitoring managed by MonitoringService
 
   if (loading) {
     return (
@@ -113,7 +126,7 @@ export default function DashboardScreen() {
       {/* Streak */}
       <Card style={styles.streakCard}>
         <StreakCounter
-          currentStreak={streak?.current_streak ?? 0}
+          currentStreak={streak ? calculateStreak(streak.streak_started_at) : 0}
           longestStreak={streak?.longest_streak ?? 0}
         />
       </Card>

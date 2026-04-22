@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ScreenLayout, Input, Button, theme } from '@ascension/ui';
+import { ScreenLayout, Input, Button, Card, theme } from '@ascension/ui';
 import { useAuth } from '../src/hooks/useAuth';
 
 export default function SignupScreen() {
@@ -13,6 +13,7 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handleSignUp = async () => {
     if (!email.trim()) {
@@ -35,8 +36,9 @@ export default function SignupScreen() {
       const result = await signUp(email.trim().toLowerCase(), password);
       if (result.error) {
         setError(result.error);
+      } else {
+        setEmailSent(true);
       }
-      // Auth state change will handle navigation to onboarding
     } catch (err) {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -89,12 +91,20 @@ export default function SignupScreen() {
 
           {error && <Text style={styles.error}>{error}</Text>}
 
-          <Button
-            title={loading ? 'Creating account...' : 'Sign Up'}
-            onPress={handleSignUp}
-            disabled={loading}
-            style={styles.button}
-          />
+          {emailSent ? (
+            <Card style={styles.successCard}>
+              <Text style={styles.successText}>
+                A confirmation email has been sent to {email}. Please verify your email then sign in.
+              </Text>
+            </Card>
+          ) : (
+            <Button
+              title={loading ? 'Creating account...' : 'Sign Up'}
+              onPress={handleSignUp}
+              disabled={loading}
+              style={styles.button}
+            />
+          )}
         </View>
 
         <View style={styles.footer}>
@@ -142,6 +152,17 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: theme.spacing.sm,
+  },
+  successCard: {
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.successLight,
+    borderColor: theme.colors.success,
+  },
+  successText: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.success,
+    lineHeight: 22,
   },
   footer: {
     flexDirection: 'row',

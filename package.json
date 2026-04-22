@@ -12,7 +12,12 @@
     "test:ui": "jest --selectProjects ui",
     "test:monitoring": "jest --selectProjects monitoring"
   },
+  "dependencies": {
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
   "devDependencies": {
+    "react-native": "0.79.6",
     "@testing-library/jest-native": "^5.4.0",
     "@testing-library/react-native": "^12.4.0",
     "@types/jest": "^29.5.0",
@@ -25,7 +30,7 @@
     "ts-jest": "^29.1.0"
   },
   "overrides": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
   }
 }

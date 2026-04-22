@@ -5,12 +5,14 @@ import { ScreenLayout, Button, Card, Badge, theme } from '@ascension/ui';
 import type { UserProfile } from '../../src/hooks/useApi';
 import { useApi } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useOnboarding } from '../_layout';
 
 export default function OnboardingConfirmScreen() {
   const router = useRouter();
   const api = useApi();
   const { user } = useAuth();
 
+  const { completeOnboarding } = useOnboarding();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,6 +31,7 @@ export default function OnboardingConfirmScreen() {
   }, [api, user]);
 
   const handleStart = () => {
+    completeOnboarding();
     router.replace('/');
   };
 

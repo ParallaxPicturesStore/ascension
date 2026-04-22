@@ -51,6 +51,7 @@ export interface PartnerData {
 export interface Screenshot {
   id: string;
   user_id: string;
+  partner_id: string | null;
   timestamp: string;
   file_path: string | null;
   rekognition_score: number;
@@ -63,6 +64,7 @@ export interface Screenshot {
 
 export interface ScreenshotLog {
   user_id: string;
+  partner_id?: string | null;
   timestamp: string;
   rekognition_score: number;
   flagged: boolean;
@@ -115,6 +117,7 @@ export interface Streak {
   user_id: string;
   current_streak: number;
   longest_streak: number;
+  streak_started_at: string;
   last_relapse_date: string | null;
   updated_at: string;
 }

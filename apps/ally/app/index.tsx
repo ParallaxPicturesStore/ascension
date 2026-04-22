@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,30 +6,71 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   theme,
-  ScreenLayout,
   Card,
   Badge,
-  BlurredImage,
   Avatar,
   SectionHeader,
+  BlurredImage,
 } from '@ascension/ui';
 import { formatRelativeTime } from '@ascension/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
 import { useApi } from '../src/hooks/useApi';
-import { config } from '../src/config';
 import type { Screenshot } from '@ascension/api';
 
-function getScreenshotUri(filePath: string | null | undefined): string | null {
-  if (!filePath) return null;
-  // Already a full URL (e.g. older records stored the full public URL)
-  if (filePath.startsWith('http')) return filePath;
-  // Storage path — construct the public URL
-  return `${config.supabaseUrl}/storage/v1/object/public/${filePath}`;
+// Fetches a short-lived signed URL for a private-bucket screenshot and
+// renders it. Falls back to a placeholder if the path is missing or the
+// request fails.
+function ScreenshotImage({ filePath }: { filePath: string | null }) {
+  const api = useApi();
+  const [uri, setUri] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!!filePath);
+
+  useEffect(() => {
+    if (!filePath) { setLoading(false); return; }
+    let cancelled = false;
+    api.screenshots.getSignedUrl(filePath).then((url) => {
+      if (!cancelled) { setUri(url); setLoading(false); }
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [filePath, api]);
+
+  if (!filePath) {
+    return (
+      <View style={styles.placeholderImage}>
+        <Text style={styles.placeholderText}>No preview</Text>
+      </View>
+    );
+  }
+  if (loading) {
+    return (
+      <View style={styles.placeholderImage}>
+        <ActivityIndicator size="small" color={theme.colors.accent} />
+      </View>
+    );
+  }
+  if (!uri) {
+    return (
+      <View style={styles.placeholderImage}>
+        <Text style={styles.placeholderText}>Failed to load</Text>
+      </View>
+    );
+  }
+  return (
+    <BlurredImage
+      source={{ uri }}
+      blurRadius={30}
+      style={styles.thumbnail}
+    />
+  );
 }
 
 type FilterMode = 'all' | 'flagged';
@@ -45,12 +86,15 @@ export default function HomeScreen() {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [screenshotsLoading, setScreenshotsLoading] = useState(true);
 
-  // Fetch screenshots on mount and refresh
+  // Fetch screenshots on mount and refresh.
+  // Uses getRecentByPartner so we query by the ally's own user ID — no need
+  // to wait for partner data to resolve first, and works even if partner_id
+  // is set without the monitored user knowing the ally's ID in advance.
   const loadScreenshots = useCallback(async () => {
-    if (!partner) return;
+    if (!session?.user?.id) return;
     setScreenshotsLoading(true);
     try {
-      const recent = await api.screenshots.getRecent(partner.id, 500);
+      const recent = await api.screenshots.getRecentByPartner(session.user.id, 500);
       console.log(recent);
       
       setScreenshots(recent);
@@ -59,7 +103,7 @@ export default function HomeScreen() {
     } finally {
       setScreenshotsLoading(false);
     }
-  }, [api, partner]);
+  }, [api, session?.user?.id]);
 
   React.useEffect(() => {
     loadScreenshots();
@@ -84,20 +128,9 @@ export default function HomeScreen() {
   const partnerName = partner?.name ?? 'Your partner';
 
   const renderScreenshotItem = useCallback(({ item }: { item: Screenshot }) => {
-    const imageUri = getScreenshotUri(item.file_path);
     return (
       <Card style={styles.feedItem}>
-        {imageUri ? (
-          <BlurredImage
-            source={{ uri: imageUri }}
-            blurRadius={30}
-            style={styles.thumbnail}
-          />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No preview</Text>
-          </View>
-        )}
+        <ScreenshotImage filePath={item.file_path} />
         <View style={styles.feedMeta}>
           <Text style={styles.feedTime}>
             {formatRelativeTime(item.timestamp)}

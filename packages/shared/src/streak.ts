@@ -4,41 +4,18 @@
  */
 
 /**
- * Calculate the current streak in days from the last relapse date.
- * If there is no relapse date, returns the existing currentStreak value.
+ * Calculate the current streak in days from when the streak started.
+ * streakStartedAt is set at account creation and reset to now() on each relapse.
  */
-export function calculateStreak(
-  lastRelapseDate: string | null,
-  currentStreak: number
-): number {
-  if (!lastRelapseDate) return currentStreak;
-
-  const relapse = new Date(lastRelapseDate);
+export function calculateStreak(streakStartedAt: string): number {
+  const start = new Date(streakStartedAt);
   const now = new Date();
 
-  // Zero out time components for day-level comparison
-  relapse.setHours(0, 0, 0, 0);
+  start.setHours(0, 0, 0, 0);
   now.setHours(0, 0, 0, 0);
 
-  const diffMs = now.getTime() - relapse.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
-}
-
-/**
- * Determine whether the streak should be incremented based on last update.
- * Returns true if at least 24 hours have elapsed since lastUpdateDate.
- */
-export function shouldIncrementStreak(lastUpdateDate: string | null): boolean {
-  if (!lastUpdateDate) return true;
-
-  const last = new Date(lastUpdateDate);
-  const now = new Date();
-  const diffMs = now.getTime() - last.getTime();
-  const oneDayMs = 24 * 60 * 60 * 1000;
-
-  return diffMs >= oneDayMs;
 }
 
 /**

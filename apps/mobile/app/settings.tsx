@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, Alert, ActivityIndicator, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ScreenLayout,
@@ -37,6 +37,8 @@ export default function SettingsScreen() {
 
   const [partnerEmail, setPartnerEmail] = useState('');
   const [savingPartner, setSavingPartner] = useState(false);
+
+  const [managingSubscription, setManagingSubscription] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -86,6 +88,28 @@ export default function SettingsScreen() {
       Alert.alert('Error', 'Failed to update partner.');
     } finally {
       setSavingPartner(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    if (!user) return;
+    setManagingSubscription(true);
+    try {
+      const customerId = await api.billing.getCustomerId(user.id);
+      if (!customerId) {
+        Alert.alert('No Subscription', 'No active subscription found to manage.');
+        return;
+      }
+      const session = await api.billing.createPortalSession(customerId);
+      if (!session?.url) {
+        Alert.alert('Error', 'Could not open subscription portal. Please try again.');
+        return;
+      }
+      await Linking.openURL(session.url);
+    } catch {
+      Alert.alert('Error', 'Failed to open subscription portal.');
+    } finally {
+      setManagingSubscription(false);
     }
   };
 
@@ -201,6 +225,16 @@ export default function SettingsScreen() {
             title="View Plans"
             variant="primary"
             onPress={() => router.push('/pricing')}
+            style={styles.planButton}
+          />
+        )}
+
+        {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled') && (
+          <Button
+            title={managingSubscription ? 'Opening...' : 'Manage Subscription'}
+            variant="secondary"
+            onPress={handleManageSubscription}
+            disabled={managingSubscription}
             style={styles.planButton}
           />
         )}

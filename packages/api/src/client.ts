@@ -16,7 +16,6 @@ import type {
   ScreenshotStats,
   Alert,
   CreateAlert,
-  AlertType,
   BlockedAttempt,
   Streak,
   WeeklyStats,
@@ -62,6 +61,8 @@ export interface AscensionAPI {
   screenshots: {
     log(data: ScreenshotLog): Promise<void>;
     getRecent(userId: string, limit?: number): Promise<Screenshot[]>;
+    getRecentByPartner(partnerId: string, limit?: number): Promise<Screenshot[]>;
+    getSignedUrl(filePath: string, expiresIn?: number): Promise<string | null>;
     getStats(userId: string): Promise<ScreenshotStats>;
   };
 
@@ -110,7 +111,14 @@ export interface AscensionAPI {
 // ── Factory ─────────────────────────────────────────────────
 
 export function createApiClient(config: AscensionApiConfig): AscensionAPI {
-  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      storage: config.storage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  });
   const functionsBase = config.functionsBaseUrl ?? `${config.supabaseUrl}/functions/v1`;
 
   // Helper to call Edge Functions with the user's access token
@@ -145,6 +153,10 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
     async signUp(email, password) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) return { user: null, session: null, error: error.message };
+      // Supabase returns an empty identities array instead of an error when the email is already registered
+      if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+        return { user: null, session: null, error: 'An account with this email already exists. Please sign in instead.' };
+      }
       return {
         user: data.user ? { id: data.user.id, email: data.user.email! } : null,
         session: data.session as Session | null,
@@ -285,6 +297,26 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
         .limit(limit);
       if (error) throw new Error(error.message);
       return (data ?? []) as Screenshot[];
+    },
+
+    async getRecentByPartner(partnerId, limit = 20) {
+      const { data, error } = await supabase
+        .from('screenshots')
+        .select('*')
+        .eq('partner_id', partnerId)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Screenshot[];
+    },
+
+    async getSignedUrl(filePath) {
+      // Bucket is public — construct the direct public URL.
+      // filePath is stored as "screenshots/{userId}/{timestamp}.jpg"
+      // which is already the full path including the bucket name.
+      if (!filePath) return null;
+      if (filePath.startsWith('http')) return filePath;
+      return `${config.supabaseUrl}/storage/v1/object/public/${filePath}`;
     },
 
     async getStats(userId) {

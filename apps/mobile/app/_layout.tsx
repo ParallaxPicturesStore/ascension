@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, View, Text, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -28,6 +28,16 @@ export function useApi(): AscensionAPI {
 }
 
 // ---------------------------------------------------------------------------
+// Onboarding context — lets child screens mark onboarding as done so the
+// routing effect doesn't redirect them back to /onboarding on navigate.
+// ---------------------------------------------------------------------------
+
+const OnboardingContext = createContext<{ completeOnboarding: () => void }>({
+  completeOnboarding: () => {},
+});
+export function useOnboarding() { return useContext(OnboardingContext); }
+
+// ---------------------------------------------------------------------------
 // Auth gate + monitoring lifecycle
 // ---------------------------------------------------------------------------
 
@@ -41,6 +51,8 @@ function AuthGate() {
 
   // Track whether we've started monitoring for this session
   const monitoringStarted = useRef(false);
+  // Sync flag so the routing guard doesn't redirect back to onboarding mid-navigation
+  const onboardingDone = useRef(false);
 
   // Detection alert modal state
   const [detection, setDetection] = useState<AnalysisResult | null>(null);
@@ -109,6 +121,7 @@ function AuthGate() {
       }
       setProfileChecked(false);
       setNeedsOnboarding(false);
+      onboardingDone.current = false;
       return;
     }
 
@@ -139,13 +152,18 @@ function AuthGate() {
     }
 
     if (profileChecked) {
-      if (needsOnboarding && !inOnboarding) {
+      if (needsOnboarding && !inOnboarding && !onboardingDone.current) {
         router.replace('/onboarding');
       } else if (!needsOnboarding && (inAuthGroup || inOnboarding)) {
         router.replace('/');
       }
     }
   }, [session, loading, segments, profileChecked, needsOnboarding, user, api, router]);
+
+  const completeOnboarding = useCallback(() => {
+    onboardingDone.current = true;
+    setNeedsOnboarding(false);
+  }, []);
 
   if (loading) {
     return (
@@ -156,7 +174,7 @@ function AuthGate() {
   }
 
   return (
-    <>
+    <OnboardingContext.Provider value={{ completeOnboarding }}>
       <Slot />
 
       {/* Detection alert modal — shown when NSFW content is detected */}
@@ -191,7 +209,7 @@ function AuthGate() {
           </View>
         </View>
       </Modal>
-    </>
+    </OnboardingContext.Provider>
   );
 }
 

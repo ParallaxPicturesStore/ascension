@@ -18,6 +18,7 @@ import { Platform } from 'react-native';
 import {
   startCapture,
   stopCapture,
+  getCaptureStatus,
   onScreenshotCaptured,
   type ScreenshotEvent,
   type CaptureStatus,
@@ -28,7 +29,8 @@ import {
   analyzeImage,
   type AnalysisResult,
 } from './ContentAnalyzer';
-import { sendHeartbeat, reportFlag } from './AntiTamper';
+import { vpnManager } from '../native/VPNManager';
+import { sendHeartbeat, reportFlag, reportVPNBlock } from './AntiTamper';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,6 +58,7 @@ let state: MonitoringState = {
 
 let unsubscribeCapture: (() => void) | null = null;
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+let vpnSyncInterval: ReturnType<typeof setInterval> | null = null;
 
 // Credentials stored at module level for heartbeat and analysis closures
 let _userId = '';
@@ -64,7 +67,12 @@ let _userAccessToken = '';
 let _supabaseAnonKey = '';
 let _platform: 'android' | 'ios' = 'android';
 
+// Tracks the most recent blocked-attempt timestamp we have already synced
+// so we don't re-report the same entries on every poll cycle.
+let _lastSyncedBlockTimestamp = 0;
+
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+const VPN_SYNC_INTERVAL_MS  = 2 * 60 * 1000; // sync blocked attempts every 2 minutes
 
 // ---------------------------------------------------------------------------
 // Detection callbacks
@@ -114,14 +122,39 @@ export async function startMonitoring(
   _supabaseAnonKey = supabaseAnonKey;
   _platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
+  // iOS: start the VPN DNS filter tunnel + begin syncing blocked attempts
+  if (Platform.OS === 'ios') {
+    const started = await vpnManager.startVPN();
+    console.log(`[MonitoringService] VPN tunnel ${started ? 'started' : 'already running'}`);
+
+    // Reset the sync cursor to now so we only forward new blocks going forward
+    const existing = await vpnManager.getRecentBlocked();
+    _lastSyncedBlockTimestamp = existing.length > 0
+      ? Math.max(...existing.map((e) => e.timestamp))
+      : Math.floor(Date.now() / 1000);
+
+    vpnSyncInterval = setInterval(() => {
+      syncVPNBlocks().catch((err) =>
+        console.warn('[MonitoringService] VPN sync failed:', err),
+      );
+    }, VPN_SYNC_INTERVAL_MS);
+  }
+
   // Android-only: load model (no-op for API-based analyzer) and start capture
   if (Platform.OS === 'android') {
     console.log('[MonitoringService] Loading model...');
     await loadModel();
 
-    console.log('[MonitoringService] Requesting screen capture permission...');
-    await startCapture();
-    console.log('[MonitoringService] Screen capture started — listening for screenshots');
+    // Skip the permission dialog if capture is already running (e.g. after a JS reload
+    // or if startMonitoring is called a second time in the same native session).
+    const captureStatus = await getCaptureStatus();
+    if (captureStatus !== 'active') {
+      console.log('[MonitoringService] Requesting screen capture permission...');
+      await startCapture();
+      console.log('[MonitoringService] Screen capture started — listening for screenshots');
+    } else {
+      console.log('[MonitoringService] Screen capture already active — skipping permission dialog');
+    }
 
     unsubscribeCapture = onScreenshotCaptured((event) => {
       console.log(`[MonitoringService] Screenshot received ts=${event.timestamp} size=${event.base64.length}B`);
@@ -167,6 +200,14 @@ export async function stopMonitoring(): Promise<void> {
     heartbeatInterval = null;
   }
 
+  if (Platform.OS === 'ios') {
+    if (vpnSyncInterval) {
+      clearInterval(vpnSyncInterval);
+      vpnSyncInterval = null;
+    }
+    await vpnManager.stopVPN();
+  }
+
   if (Platform.OS === 'android') {
     await stopCapture();
     unloadModel();
@@ -193,6 +234,39 @@ export function updateAccessToken(newToken: string): void {
  */
 export function getMonitoringState(): MonitoringState {
   return { ...state };
+}
+
+// ---------------------------------------------------------------------------
+// VPN blocked-attempt sync (iOS only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Poll the shared App Group for new blocked attempts written by the
+ * PacketTunnelProvider extension and report each unseen one to the server.
+ * Uses _lastSyncedBlockTimestamp as a cursor to avoid double-reporting.
+ */
+async function syncVPNBlocks(): Promise<void> {
+  const entries = await vpnManager.getRecentBlocked();
+  const unseen = entries.filter((e) => e.timestamp > _lastSyncedBlockTimestamp);
+  if (unseen.length === 0) return;
+
+  console.log(`[MonitoringService] Syncing ${unseen.length} new VPN block(s)`);
+
+  for (const entry of unseen) {
+    await reportVPNBlock(
+      _userId,
+      _supabaseUrl,
+      _userAccessToken,
+      _supabaseAnonKey,
+      entry.domain,
+      entry.timestamp,
+    ).catch((err: unknown) =>
+      console.warn('[MonitoringService] Failed to report VPN block:', err),
+    );
+    if (entry.timestamp > _lastSyncedBlockTimestamp) {
+      _lastSyncedBlockTimestamp = entry.timestamp;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
