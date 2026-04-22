@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { linkPartner, supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
   User,
@@ -67,10 +67,20 @@ export default function SettingsPage() {
     if (!profile) return;
     setSaving(true);
 
-    await supabase
+    const normalizedPartnerEmail = partnerEmail.trim().toLowerCase();
+
+    const { error: updateError } = await supabase
       .from("users")
-      .update({ name, partner_email: partnerEmail, goals })
+      .update({ name, goals })
       .eq("id", profile.id);
+
+    if (!updateError) {
+      try {
+        await linkPartner(profile.id, normalizedPartnerEmail || null);
+      } catch (err) {
+        console.error("[Settings] Failed to link partner:", err);
+      }
+    }
 
     setSaving(false);
   }

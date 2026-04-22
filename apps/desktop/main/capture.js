@@ -284,21 +284,21 @@ async function pauseCapture() {
       console.log("[Capture] Evasion alert sent to partner via Edge Function");
     }
 
-    // if (user?.partner_email && token) {
-    //   await callEdgeFunction(
-    //     "alerts.sendEmail",
-    //     {
-    //       type: "evasion",
-    //       to: user.partner_email,
-    //       userName: user.name,
-    //       data: { action: "paused" },
-    //     },
-    //     token,
-    //   );
-    //   console.log(
-    //     "[Capture] Evasion alert email sent to partner via Edge Function",
-    //   );
-    // }
+    if (user?.partner_email && token) {
+      await callEdgeFunction(
+        "alerts.sendEmail",
+        {
+          type: "evasion",
+          to: user.partner_email,
+          userName: user.name,
+          data: { action: "paused" },
+        },
+        token,
+      );
+      console.log(
+        "[Capture] Evasion alert email sent to partner via Edge Function",
+      );
+    }
   } catch (err) {
     console.error("[Capture] Failed to send pause evasion alert:", err.message);
   }

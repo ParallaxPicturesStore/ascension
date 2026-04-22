@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase, syncPartnerLinks } from "@/lib/supabase";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -38,6 +38,14 @@ export default function SignupPage() {
       setError(authError.message);
       setLoading(false);
       return;
+    }
+
+    if (data.session?.user?.id) {
+      try {
+        await syncPartnerLinks(data.session.user.id);
+      } catch (err) {
+        console.error("[Signup] Failed to sync partner links:", err);
+      }
     }
 
     // New users should sign in first; dashboard auth check sends incomplete profiles into onboarding.

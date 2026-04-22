@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase, syncPartnerLinks } from "@/lib/supabase";
 import StreakCounter from "@/components/StreakCounter";
 import StatusIndicator from "@/components/StatusIndicator";
 import AlertList from "@/components/AlertList";
@@ -58,6 +58,12 @@ export default function Dashboard() {
     if (!session) {
       router.push("/login");
       return;
+    }
+
+    try {
+      await syncPartnerLinks(session.user.id);
+    } catch (err) {
+      console.error("[Dashboard] Failed to sync partner links:", err);
     }
 
     const { data: profile } = await supabase

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabase, syncPartnerLinks } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,7 +17,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -26,6 +26,14 @@ export default function LoginPage() {
       setError(authError.message);
       setLoading(false);
       return;
+    }
+
+    if (data.user?.id) {
+      try {
+        await syncPartnerLinks(data.user.id);
+      } catch (err) {
+        console.error("[Login] Failed to sync partner links:", err);
+      }
     }
 
     router.push("/");

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { linkPartner, supabase } from "@/lib/supabase";
 
 export default function OnboardingPartner() {
   const router = useRouter();
@@ -28,13 +28,9 @@ export default function OnboardingPartner() {
       return;
     }
 
-    // Save partner email
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({ partner_email: partnerEmail })
-      .eq("id", session.user.id);
-
-    if (updateError) {
+    try {
+      await linkPartner(session.user.id, partnerEmail.trim().toLowerCase());
+    } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
       return;
