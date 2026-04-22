@@ -1,4 +1,5 @@
 const { desktopCapturer } = require("electron");
+const screenshot = require("screenshot-desktop");
 const sharp = require("sharp");
 const crypto = require("crypto");
 const path = require("path");
@@ -28,15 +29,42 @@ function ensureTempDir() {
   }
 }
 
-async function captureScreen() {
-  const sources = await desktopCapturer.getSources({
-    types: ["screen"],
-    thumbnailSize: { width: 1920, height: 1080 },
-  });
-  if (sources.length > 0) {
-    return sources[0].thumbnail.toPNG();
+function formatError(err) {
+  if (err instanceof Error) return err.stack || err.message;
+  if (typeof err === "string") return err;
+  try {
+    return JSON.stringify(err);
+  } catch (_) {
+    return String(err);
   }
-  return null;
+}
+
+async function captureScreen() {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 1920, height: 1080 },
+    });
+    if (sources.length > 0 && !sources[0].thumbnail.isEmpty()) {
+      return sources[0].thumbnail.toPNG();
+    }
+    console.warn(
+      "[Capture] desktopCapturer returned no usable screen source - falling back",
+    );
+  } catch (err) {
+    console.warn(
+      `[Capture] desktopCapturer failed - falling back to screenshot-desktop: ${formatError(err)}`,
+    );
+  }
+
+  try {
+    return await screenshot({ format: "png" });
+  } catch (err) {
+    console.error(
+      `[Capture] screenshot-desktop fallback failed: ${formatError(err)}`,
+    );
+    throw err;
+  }
 }
 
 async function blurScreenshot(buffer) {
@@ -233,7 +261,7 @@ async function captureAndAnalyze() {
       labels: analysis.labels,
     };
   } catch (err) {
-    console.error("[Capture] Error:", err.message);
+    console.error("[Capture] Error:", formatError(err));
     return null;
   }
 }

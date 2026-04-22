@@ -55,6 +55,11 @@ let currentUserId = null;
 let allowQuit = false;
 const isDev = !app.isPackaged;
 
+if (process.env.ASCENSION_ENABLE_GPU !== "1") {
+  app.disableHardwareAcceleration();
+  crashLog(`Hardware acceleration disabled on ${process.platform}`);
+}
+
 // Resolve the static export directory (Next.js out/)
 function getOutDir() {
   const candidates = [
