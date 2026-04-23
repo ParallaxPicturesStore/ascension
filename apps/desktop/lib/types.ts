@@ -165,7 +165,7 @@ declare global {
       }>;
       // Alerts
       sendAlert: (type: string, partnerEmail: string, userName: string, data: Record<string, unknown>) => Promise<unknown>;
-      invitePartner: (partnerEmail: string, userName: string) => Promise<unknown>;
+      invitePartner: (partnerEmail: string, userName: string, userId: string) => Promise<unknown>;
       // Streak
       getStreak: (userId: string) => Promise<{
         current_streak: number;
