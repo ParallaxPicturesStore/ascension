@@ -231,9 +231,9 @@ export default function SettingsScreen() {
 
         {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled') && (
           <Button
-            title={managingSubscription ? 'Opening...' : 'Manage Subscription'}
+            title={managingSubscription ? 'Opening...' : 'View Plan'}
             variant="secondary"
-            onPress={handleManageSubscription}
+            onPress={() => router.push('/pricing')}
             disabled={managingSubscription}
             style={styles.planButton}
           />
