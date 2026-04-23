@@ -60,6 +60,26 @@ async function callApi(
 }
 
 // ---------------------------------------------------------------------------
+// Streak reset
+// ---------------------------------------------------------------------------
+
+async function resetStreak(
+  userId: string,
+  supabaseUrl: string,
+  userAccessToken: string,
+  supabaseAnonKey: string,
+): Promise<boolean> {
+  try {
+    await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'streaks.reset', { user_id: userId });
+    console.log(`[Streak] Reset for user ${userId}`);
+    return true;
+  } catch (err) {
+    console.error('[Streak] Error resetting:', err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Heartbeat
 // ---------------------------------------------------------------------------
 
@@ -245,6 +265,7 @@ export async function reportFlag(report: FlagReport): Promise<void> {
         type: 'content_detected',
         message: `NSFW content detected (${topCategory}: ${Math.round(topScore)}%)`,
       });
+      await resetStreak(userId, supabaseUrl, userAccessToken, supabaseAnonKey);
     } else {
       console.log('[AntiTamper] No partner linked — skipping alert');
     }
