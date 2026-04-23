@@ -28,8 +28,17 @@ export default function OnboardingPartnerScreen() {
 
     try {
       await api.users.updateProfile(user.id, {
-        partner_email: partnerEmail.trim().toLowerCase(),
+        partner_email: normalizedPartnerEmail,
       });
+
+      const profile = await api.users.getProfile(user.id);
+      const inviteCode = user.id; // Using user ID as invite code for simplicity; can be changed to a generated token if needed
+      await api.alerts.invitePartner(
+        normalizedPartnerEmail,
+       inviteCode, // Using user ID as invite code for simplicity; can be changed to a generated token if needed
+        profile.name || 'Your partner',
+      );
+
       setSent(true);
     } catch {
       setError('Failed to send invitation. Please try again.');
