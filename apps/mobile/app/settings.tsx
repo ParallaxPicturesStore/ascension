@@ -237,16 +237,16 @@ export default function SettingsScreen() {
           <Badge text={badge.text} variant={badge.variant} />
         </View>
 
-        {(subscriptionStatus === 'trial' || subscriptionStatus === 'expired') && (
+        {subscriptionStatus === 'trial' && (
           <Button
-            title="Manage Subscription"
+            title="View Plans"
             variant="primary"
-            onPress={handleManageSubscription}
+            onPress={() => router.push('/pricing')}
             style={styles.planButton}
           />
         )}
 
-        {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled') && (
+        {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled' || subscriptionStatus === 'expired') && (
           <Button
             title={managingSubscription ? 'Opening...' : 'Manage Subscription'}
             variant="secondary"
