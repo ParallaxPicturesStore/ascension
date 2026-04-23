@@ -22,8 +22,8 @@ export default function ConnectScreen() {
     try {
       // Accept the invitation by updating the partner link via the user profile
       // The invite code is the partner's user ID or a generated invite token
-      await api.users.updateProfile(session.user.id, {
-        partner_id: inviteCode.trim(),
+      await api.users.updateUserPartnerId(inviteCode.trim(), {
+        partner_id: session.user.id,
       });
       router.replace('/');
     } catch (err) {

@@ -757,6 +757,67 @@ const actions: Record<string, ActionHandler> = {
     if (error) return errorResponse(error.message, 500);
     return jsonResponse({ success: true });
   },
+
+  // ── users.linkByInvite ──
+  "users.linkByInvite": async (payload, callerId) => {
+    const { invite_code } = payload as { invite_code: string };
+
+    if (!invite_code) {
+      return errorResponse("invite_code is required", 400);
+    }
+
+    if (invite_code === callerId) {
+      return errorResponse("You cannot connect to your own account", 400);
+    }
+
+    // Ensure target (monitored user) exists.
+    const { data: monitoredUser, error: monitoredErr } = await adminDb
+      .from("users")
+      .select("id")
+      .eq("id", invite_code)
+      .single();
+
+    if (monitoredErr || !monitoredUser) {
+      return errorResponse("Invite code not found", 404);
+    }
+
+    // Ensure caller (ally user) exists.
+    const { data: allyUser, error: allyErr } = await adminDb
+      .from("users")
+      .select("id")
+      .eq("id", callerId)
+      .single();
+
+    if (allyErr || !allyUser) {
+      return errorResponse("Current ally user row not found", 404);
+    }
+
+    // Requested mapping: on monitored user row, set partner_id = ally user id.
+    const { error: monitoredUpdateErr } = await adminDb
+      .from("users")
+      .update({ partner_id: callerId })
+      .eq("id", invite_code);
+
+    if (monitoredUpdateErr) {
+      return errorResponse(monitoredUpdateErr.message, 500);
+    }
+
+    // Also set ally row so ally app can resolve partner data from partner_id.
+    const { error: allyUpdateErr } = await adminDb
+      .from("users")
+      .update({ partner_id: invite_code })
+      .eq("id", callerId);
+
+    if (allyUpdateErr) {
+      return errorResponse(allyUpdateErr.message, 500);
+    }
+
+    return jsonResponse({
+      success: true,
+      monitored_user_id: invite_code,
+      ally_user_id: callerId,
+    });
+  },
 };
 
 // ── Main handler ────────────────────────────────────────────

@@ -50,7 +50,8 @@ export default function OnboardingPartner() {
 
       await window.ascension.invitePartner(
         partnerEmail,
-        userProfile?.name || "Your partner"
+        userProfile?.name || "Your partner",
+        session.user.id,
       );
     }
 

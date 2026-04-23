@@ -16,12 +16,19 @@ export default function OnboardingPartnerScreen() {
   const [sent, setSent] = useState(false);
 
   const handleInvite = async () => {
-    if (!partnerEmail.trim()) {
+    const normalizedPartnerEmail = partnerEmail.trim().toLowerCase();
+
+    if (!normalizedPartnerEmail) {
       setError('Please enter your partner\'s email.');
       return;
     }
 
     if (!user) return;
+
+    if (normalizedPartnerEmail === user.email.trim().toLowerCase()) {
+      setError("You can't be your own accountability partner.");
+      return;
+    }
 
     setError(null);
     setSending(true);
@@ -35,11 +42,12 @@ export default function OnboardingPartnerScreen() {
       const inviteCode = user.id; // Using user ID as invite code for simplicity; can be changed to a generated token if needed
       await api.alerts.invitePartner(
         normalizedPartnerEmail,
-       inviteCode, // Using user ID as invite code for simplicity; can be changed to a generated token if needed
         profile.name || 'Your partner',
+        inviteCode,
       );
 
       setSent(true);
+      setPartnerEmail(normalizedPartnerEmail);
     } catch {
       setError('Failed to send invitation. Please try again.');
     } finally {

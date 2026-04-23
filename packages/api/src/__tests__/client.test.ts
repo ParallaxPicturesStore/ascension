@@ -220,6 +220,34 @@ describe('alerts.markRead', () => {
   });
 });
 
+describe('alerts.invitePartner', () => {
+  it('calls the ascension-api edge function with the partner invitation payload', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+
+    await api.alerts.invitePartner('partner@example.com', 'Test User');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://test.supabase.co/functions/v1/ascension-api',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'alerts.sendEmail',
+          payload: {
+            type: 'partner_invitation',
+            to: 'partner@example.com',
+            userName: 'Test User',
+            data: {
+              signupUrl: 'https://getascension.app/signup',
+            },
+          },
+        }),
+      }),
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Edge Function calls
 // ---------------------------------------------------------------------------

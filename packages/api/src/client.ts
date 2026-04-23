@@ -57,6 +57,7 @@ export interface AscensionAPI {
     getPartnerData(userId: string): Promise<PartnerData | null>;
     setQuitPassword(userId: string, passwordHash: string): Promise<void>;
     getQuitPasswordHash(userId: string): Promise<string | null>;
+    updateUserPartnerId(inviteCode: string, data: { partner_id: string }): Promise<void>;
   };
 
   screenshots: {
@@ -284,6 +285,9 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
         updatedRow: data[0],
       });
     },
+  async updateUserPartnerId(inviteCode, data) {
+      await supabase.from('users').update(data).eq('id', inviteCode);
+    },
 
     async linkByInvite(inviteCode) {
       await callEdgeFunction('ascension-api', {
@@ -296,20 +300,25 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
 
     async getPartnerData(userId) {
       // Get the user's partner_id first
-      const { data: user } = await supabase
-        .from('users')
-        .select('partner_id')
-        .eq('id', userId)
-        .single();
+        console.log("User : " , userId);
+      
+      const user={
+        partner_id:userId
+      }
 
+      console.log("user_id : ", user.partner_id);
+      
       if (!user?.partner_id) return null;
 
-      // Fetch partner profile (RLS allows partner reads)
-      const { data: partner } = await supabase
+      // Fetch partner profile (RLS allows partner reads)      
+      const { data: partner, error: partnerError } = await supabase
         .from('users')
         .select('id, name, email, subscription_status')
-        .eq('id', user.partner_id)
+        .eq('partner_id', user.partner_id)
         .single();
+        console.log("userId , username, useremail : " , userId, partner?.name, partner?.email);
+      console.log("partner data : " , partner);
+console.log(partnerError);
 
       if (!partner) return null;
 

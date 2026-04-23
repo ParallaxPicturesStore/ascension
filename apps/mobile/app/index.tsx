@@ -163,7 +163,7 @@ export default function DashboardScreen() {
       {/* Streak */}
       <Card style={styles.streakCard}>
         <StreakCounter
-          currentStreak={calculateStreak(streak?.streak_started_at ?? '') ?? 0}
+          currentStreak={calculateStreak(streak?.streak_started_at) ?? 0}
           longestStreak={streak?.longest_streak ?? 0}
         />
       </Card>
