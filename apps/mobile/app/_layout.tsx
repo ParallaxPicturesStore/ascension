@@ -11,6 +11,7 @@ import { useAuth } from '../src/hooks/useAuth';
 import { config } from '../src/config';
 import { startMonitoring, stopMonitoring, onDetection } from '../src/services/MonitoringService';
 import type { AnalysisResult } from '../src/services/ContentAnalyzer';
+import { isSubscriptionExpired } from '../src/utils/subscription';
 
 // SecureStore-backed storage adapter so Supabase sessions persist across restarts
 const secureStoreAdapter: StorageAdapter = {
@@ -48,6 +49,7 @@ function AuthGate() {
   const router = useRouter();
   const [profileChecked, setProfileChecked] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
   // Track whether we've started monitoring for this session
   const monitoringStarted = useRef(false);
@@ -76,7 +78,15 @@ function AuthGate() {
       return;
     }
 
-    if (!profileChecked || needsOnboarding) return; // Wait until onboarding is done
+    if (!profileChecked || needsOnboarding || subscriptionExpired) {
+      if (subscriptionExpired && monitoringStarted.current) {
+        monitoringStarted.current = false;
+        stopMonitoring().catch((err) =>
+          console.warn('[Layout] stopMonitoring error:', err),
+        );
+      }
+      return; // Wait until onboarding is done and subscription is valid
+    }
 
     if (monitoringStarted.current) return; // Already started for this session
     monitoringStarted.current = true;
@@ -107,7 +117,7 @@ function AuthGate() {
         ],
       );
     });
-  }, [session, user, profileChecked, needsOnboarding]);
+  }, [session, user, profileChecked, needsOnboarding, subscriptionExpired]);
 
   useEffect(() => {
     if (loading) return;
@@ -121,6 +131,7 @@ function AuthGate() {
       }
       setProfileChecked(false);
       setNeedsOnboarding(false);
+      setSubscriptionExpired(false);
       onboardingDone.current = false;
       return;
     }
@@ -131,7 +142,10 @@ function AuthGate() {
         .getProfile(user.id)
         .then((profile) => {
           const incomplete = !profile.name;
+          const expired = isSubscriptionExpired(profile.subscription_lapse_date)
+            || profile.subscription_status === 'expired';
           setNeedsOnboarding(incomplete);
+          setSubscriptionExpired(expired);
           setProfileChecked(true);
 
           if (incomplete && !inOnboarding) {
@@ -143,6 +157,7 @@ function AuthGate() {
         .catch(() => {
           // Profile doesn't exist yet - needs onboarding
           setNeedsOnboarding(true);
+          setSubscriptionExpired(false);
           setProfileChecked(true);
           if (!inOnboarding) {
             router.replace('/onboarding');

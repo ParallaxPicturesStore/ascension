@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform } from 'react-native';
+import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ScreenLayout,
@@ -16,6 +16,8 @@ import { calculateStreak } from '@ascension/shared';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 import { vpnManager } from '../src/native/VPNManager';
+import { stopMonitoring } from '../src/services/MonitoringService';
+import { isSubscriptionExpired } from '../src/utils/subscription';
 
 export default function DashboardScreen() {
   const api = useApi();
@@ -30,18 +32,24 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [vpnStatus, setVpnStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'error'>('disconnected');
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user) return;
 
     try {
       setError(null);
-      const [streakData, alertsData, statsData, weeklyData] = await Promise.all([
+      const [streakData, alertsData, statsData, weeklyData, profile] = await Promise.all([
         api.streaks.get(user.id),
         api.alerts.getForUser(user.id),
         api.screenshots.getStats(user.id),
         api.streaks.getWeeklyStats(user.id),
+        api.users.getProfile(user.id),
       ]);
+
+      const expired = isSubscriptionExpired(profile.subscription_lapse_date)
+        || profile.subscription_status === 'expired';
+      setSubscriptionExpired(expired);
 
       setStreak(streakData);
       setAlerts(alertsData.slice(0, 5));
@@ -53,6 +61,13 @@ export default function DashboardScreen() {
       setLoading(false);
     }
   }, [api, user]);
+
+  useEffect(() => {
+    if (!subscriptionExpired) return;
+    stopMonitoring().catch((err) =>
+      console.warn('[Dashboard] stopMonitoring error:', err),
+    );
+  }, [subscriptionExpired]);
 
   useEffect(() => {
     loadData();
@@ -102,6 +117,28 @@ export default function DashboardScreen() {
     );
   }
 
+  if (subscriptionExpired) {
+    return (
+      <ScreenLayout title="Dashboard" scrollable={false}>
+        <Modal visible transparent animationType="fade">
+          <View style={styles.subscriptionModalOverlay}>
+            <Card style={styles.subscriptionModalCard}>
+              <Text style={styles.subscriptionModalTitle}>Subscription Ended</Text>
+              <Text style={styles.subscriptionModalBody}>
+                Your subscription has ended, so screen sharing and monitoring are turned off.
+              </Text>
+              <Button
+                title="Manage Subscription"
+                onPress={() => router.push('/pricing')}
+                style={styles.subscriptionModalButton}
+              />
+            </Card>
+          </View>
+        </Modal>
+      </ScreenLayout>
+    );
+  }
+
   return (
     <ScreenLayout
       title="Dashboard"
@@ -126,7 +163,7 @@ export default function DashboardScreen() {
       {/* Streak */}
       <Card style={styles.streakCard}>
         <StreakCounter
-          currentStreak={calculateStreak(streak?.streak_started_at) ?? 0}
+          currentStreak={calculateStreak(streak?.streak_started_at ?? '') ?? 0}
           longestStreak={streak?.longest_streak ?? 0}
         />
       </Card>
@@ -282,6 +319,34 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.base,
   },
   retryButton: {
+    marginTop: theme.spacing.sm,
+  },
+  subscriptionModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    padding: theme.spacing.lg,
+  },
+  subscriptionModalCard: {
+    width: '100%',
+    maxWidth: 420,
+  },
+  subscriptionModalTitle: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.h3,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.sm,
+  },
+  subscriptionModalBody: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.muted,
+    lineHeight: 22,
+    marginBottom: theme.spacing.base,
+  },
+  subscriptionModalButton: {
     marginTop: theme.spacing.sm,
   },
 });
