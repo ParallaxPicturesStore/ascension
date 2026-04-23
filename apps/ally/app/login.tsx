@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { theme, ScreenLayout, Input, Button } from '@ascension/ui';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginScreen() {
+  const router = useRouter();
   const { signIn, loading, error } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,7 +53,14 @@ export default function LoginScreen() {
           />
         </View>
 
-        <Text style={styles.footer}>
+        <View style={styles.footerCta}>
+          <Text style={styles.footerText}>Need an account?</Text>
+          <TouchableOpacity onPress={() => router.push('/signup')}>
+            <Text style={styles.link}>Sign Up</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.footerNote}>
           Your partner invited you to help them stay accountable. Sign in with
           the account you created when you accepted the invitation.
         </Text>
@@ -92,7 +101,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: theme.spacing.base,
   },
-  footer: {
+  footerCta: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
+  },
+  footerText: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.muted,
+  },
+  link: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.accent,
+  },
+  footerNote: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.caption,
     color: theme.colors.muted,

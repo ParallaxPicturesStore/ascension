@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApi } from './useApi';
-import type { Session } from '@ascension/api';
+import type { AuthResult, Session } from '@ascension/api';
 
 interface AuthState {
   session: Session | null;
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<boolean>;
+  signUp: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -81,5 +82,17 @@ export function useAuth(): AuthState {
     }
   }, [api]);
 
-  return { session, loading, error, signIn, signOut };
+  const signUp = useCallback(
+    async (email: string, password: string): Promise<AuthResult> => {
+      setError(null);
+      const result = await api.auth.signUp(email, password);
+      if (result.error) {
+        setError(result.error);
+      }
+      return result;
+    },
+    [api],
+  );
+
+  return { session, loading, error, signIn, signUp, signOut };
 }
