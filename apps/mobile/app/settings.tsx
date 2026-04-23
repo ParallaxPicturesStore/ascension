@@ -73,19 +73,36 @@ export default function SettingsScreen() {
   };
 
   const handleUpdatePartner = async () => {
-    if (!user || !partnerEmail.trim()) return;
+    const normalizedPartnerEmail = partnerEmail.trim().toLowerCase();
+
+    if (!user || !normalizedPartnerEmail) return;
+
+    if (normalizedPartnerEmail === user.email.trim().toLowerCase()) {
+      Alert.alert('Invalid Partner', "You can't be your own accountability partner.");
+      return;
+    }
 
     setSavingPartner(true);
     try {
       await api.users.updateProfile(user.id, {
-        partner_email: partnerEmail.trim().toLowerCase(),
+        partner_email: normalizedPartnerEmail,
       });
-      setProfile((prev) =>
-        prev ? { ...prev, partner_email: partnerEmail.trim().toLowerCase() } : prev,
+
+      const latestProfile = await api.users.getProfile(user.id);
+      const inviteCode = user.id;
+      await api.alerts.invitePartner(
+        normalizedPartnerEmail,
+        latestProfile.name || 'Your partner',
+        inviteCode,
       );
-      Alert.alert('Partner Updated', 'Your accountability partner has been updated.');
+
+      setProfile((prev) =>
+        prev ? { ...prev, partner_email: normalizedPartnerEmail } : prev,
+      );
+      setPartnerEmail(normalizedPartnerEmail);
+      Alert.alert('Partner Updated', 'Your accountability partner has been updated and invited.');
     } catch {
-      Alert.alert('Error', 'Failed to update partner.');
+      Alert.alert('Error', 'Failed to update partner. Please try again.');
     } finally {
       setSavingPartner(false);
     }
