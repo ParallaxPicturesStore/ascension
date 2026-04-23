@@ -53,6 +53,7 @@ export interface AscensionAPI {
   users: {
     getProfile(userId: string): Promise<UserProfile>;
     updateProfile(userId: string, data: Partial<UserProfile>): Promise<void>;
+    linkByInvite(inviteCode: string): Promise<void>;
     getPartnerData(userId: string): Promise<PartnerData | null>;
     setQuitPassword(userId: string, passwordHash: string): Promise<void>;
     getQuitPasswordHash(userId: string): Promise<string | null>;
@@ -68,6 +69,7 @@ export interface AscensionAPI {
 
   alerts: {
     create(data: CreateAlert): Promise<void>;
+    invitePartner(partnerEmail: string, inviteCode: string, userName: string): Promise<void>;
     getForPartner(partnerId: string): Promise<Alert[]>;
     getForUser(userId: string): Promise<Alert[]>;
     markRead(alertId: string): Promise<void>;
@@ -207,9 +209,89 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
     },
 
     async updateProfile(userId, updates) {
-      throwOnError(
-        await supabase.from('users').update(updates).eq('id', userId),
-      );
+      console.log('[API.users.updateProfile] Request', {
+        userId,
+        updateKeys: Object.keys(updates ?? {}),
+        updates,
+      });
+      const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', userId)
+        .select('id, partner_id');
+      if (error) {
+        console.log('[API.users.updateProfile] Supabase error', {
+          userId,
+          message: error.message,
+        });
+        throw new Error(error.message);
+      }
+
+      if (!data || data.length === 0) {
+        const authUserResult = await supabase.auth.getUser();
+        const authUserId = authUserResult.data.user?.id ?? null;
+        const userEmail = authUserResult.data.user?.email ?? null;
+
+        console.log('[API.users.updateProfile] No rows updated by id, trying email fallback', {
+          userId,
+          authUserId,
+          userEmail,
+        });
+
+        // Never fallback to email when caller targets a different user id.
+        // That would update the wrong row and hide the real issue.
+        if (!authUserId || authUserId !== userId) {
+          throw new Error(
+            'Profile update matched 0 rows for the target user id. Fallback by email is only allowed for the currently authenticated user.',
+          );
+        }
+
+        if (!userEmail) {
+          throw new Error(
+            'Profile update matched 0 rows by id and no auth email was available for fallback.',
+          );
+        }
+
+        const emailFallback = await supabase
+          .from('users')
+          .update(updates)
+          .eq('email', userEmail)
+          .select('id, email, partner_id');
+
+        console.log('[API.users.updateProfile] Email fallback result', {
+          data: emailFallback.data,
+          error: emailFallback.error,
+        });
+
+        if (emailFallback.error) {
+          throw new Error(emailFallback.error.message);
+        }
+
+        if (!emailFallback.data || emailFallback.data.length === 0) {
+          throw new Error(
+            'Profile update matched 0 rows by id and by email. Verify users row exists in this Supabase project.',
+          );
+        }
+
+        console.log('[API.users.updateProfile] Success via email fallback', {
+          updatedRow: emailFallback.data[0],
+        });
+        return;
+      }
+
+      console.log('[API.users.updateProfile] Success', {
+        userId,
+        updatedRow: data[0],
+      });
+    },
+
+    async linkByInvite(inviteCode) {
+      await callEdgeFunction('ascension-api', {
+        action: 'users.linkByInvite',
+        payload: {
+          invite_code: inviteCode,
+        },
+      });
     },
 
     async getPartnerData(userId) {
@@ -354,6 +436,21 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
       await callEdgeFunction('ascension-api', {
         action: 'alerts.create',
         payload: data,
+      });
+    },
+
+    async invitePartner(partnerEmail, userName, inviteCode) {
+      await callEdgeFunction('ascension-api', {
+        action: 'alerts.sendEmail',
+        payload: {
+          type: 'partner_invitation',
+          to: partnerEmail,
+          userName,
+          data: {
+            signupUrl: 'https://getascension.app/signup',
+            inviteCode ,
+          },
+        },
       });
     },
 
