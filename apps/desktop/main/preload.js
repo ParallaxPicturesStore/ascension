@@ -17,8 +17,12 @@ contextBridge.exposeInMainWorld("ascension", {
   // Alerts
   sendAlert: (type, partnerEmail, userName, data) =>
     ipcRenderer.invoke("alert:send", { type, partnerEmail, userName, data }),
-  invitePartner: (partnerEmail, userName) =>
-    ipcRenderer.invoke("alert:invite-partner", { partnerEmail, userName }),
+  invitePartner: (partnerEmail, userName, authContext) =>
+    ipcRenderer.invoke("alert:invite-partner", {
+      partnerEmail,
+      userName,
+      ...(authContext || {}),
+    }),
 
   // Streak
   getStreak: (userId) => ipcRenderer.invoke("streak:get", userId),

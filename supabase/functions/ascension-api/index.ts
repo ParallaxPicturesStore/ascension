@@ -12,11 +12,13 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
-import {
-  RekognitionClient,
-  DetectModerationLabelsCommand,
-} from "https://esm.sh/@aws-sdk/client-rekognition@3.540.0";
+
+// NOTE: @aws-sdk/client-rekognition is intentionally NOT imported at the top level.
+// The SDK pulls in deno.land/std@0.177.1 Node.js polyfills that register a
+// `beforeunload` handler using Deno.core.runMicrotasks(), which is no longer
+// supported in the Supabase Edge Function Deno runtime and crashes the isolate
+// on every cold start — breaking ALL actions, not just rekognition.analyze.
+// It is dynamically imported inside the action instead.
 
 // ── Supabase clients ────────────────────────────────────────
 
@@ -32,16 +34,22 @@ const anonDb = createClient(supabaseUrl, anonKey);
 
 // ── Stripe (lazy) ───────────────────────────────────────────
 
-let _stripe: Stripe | null = null;
-function getStripe(): Stripe | null {
-  if (!_stripe) {
-    const key = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!key) return null;
-    _stripe = new Stripe(key, {
-      apiVersion: "2024-06-20",
-      httpClient: Stripe.createFetchHttpClient(),
-    });
-  }
+let _stripe: any = null;
+
+async function getStripe() {
+  if (_stripe) return _stripe;
+
+  const key = Deno.env.get("STRIPE_SECRET_KEY");
+  if (!key) return null;
+
+  const StripeMod = await import("https://esm.sh/stripe@14.21.0?target=deno");
+  const Stripe = StripeMod.default;
+
+  _stripe = new Stripe(key, {
+    apiVersion: "2024-06-20",
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+
   return _stripe;
 }
 
@@ -63,19 +71,9 @@ const FLAGGED_CATEGORIES = [
   "Violence",
 ];
 
-let _rekognition: RekognitionClient | null = null;
-function getRekognition(): RekognitionClient | null {
-  if (!_rekognition) {
-    const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID");
-    const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
-    if (!accessKeyId || !secretAccessKey) return null;
-    _rekognition = new RekognitionClient({
-      region: Deno.env.get("AWS_REGION") ?? "us-east-1",
-      credentials: { accessKeyId, secretAccessKey },
-    });
-  }
-  return _rekognition;
-}
+// getRekognition() removed — Rekognition client is now created via dynamic import
+// inside the rekognition.analyze action to avoid Deno cold-start crash caused by
+// Node.js polyfills in @aws-sdk calling Deno.core.runMicrotasks() at module load time.
 
 // ── Resend (email) ─────────────────────────────────────────
 
@@ -161,7 +159,9 @@ const EMAIL_TEMPLATES: Record<string, TemplateEntry> = {
 
   partner_invitation: {
     subject: (name: string) => `${name} added you as their accountability partner`,
-    html: (name: string, data: Record<string, unknown>) => `
+    html: (name: string, data: Record<string, unknown>) => {
+      const inviteCode = data.inviteCode ? escapeHtml(String(data.inviteCode)) : "";
+      return `
       <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
         <div style="text-align: center; margin-bottom: 32px;">
           <h1 style="font-size: 14px; letter-spacing: 3px; color: #1a3a5c; margin: 0;">ASCENSION</h1>
@@ -181,6 +181,13 @@ const EMAIL_TEMPLATES: Record<string, TemplateEntry> = {
         <p style="font-size: 14px; color: #6b6560; margin-bottom: 24px;">
           Create your free partner account to view their dashboard and full activity history.
         </p>
+        ${inviteCode ? `
+        <div style="background: #eef5ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+          <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.6px; color: #1e3a8a; font-weight: 700; text-transform: uppercase;">Invite Code</p>
+          <p style="margin: 0; font-size: 16px; color: #0f172a; font-weight: 700; word-break: break-all;">${inviteCode}</p>
+          <p style="margin: 10px 0 0; font-size: 12px; color: #475569;">Use this code in the Ascension Ally app after you sign in.</p>
+        </div>
+        ` : ""}
         <div style="text-align: center;">
           <a href="${data.signupUrl}" style="display: inline-block; background: #1a3a5c; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 14px; font-weight: 600;">
             Set Up Your Account
@@ -190,7 +197,8 @@ const EMAIL_TEMPLATES: Record<string, TemplateEntry> = {
           You'll continue to receive alert emails regardless of whether you create an account.
         </p>
       </div>
-    `,
+    `;
+    },
   },
 
   subscription_lapse: {
@@ -357,6 +365,128 @@ function errorResponse(message: string, status = 400): Response {
   return jsonResponse({ error: message }, status);
 }
 
+// ── Partner link helpers ────────────────────────────────────
+
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+async function setPartnerLink(userId: string, partnerEmail: string | null) {
+  const { data: user, error: userError } = await adminDb
+    .from("users")
+    .select("id, email")
+    .eq("id", userId)
+    .single();
+
+  if (userError || !user) {
+    throw new Error("User not found");
+  }
+
+  const normalizedUserEmail = normalizeEmail(user.email);
+  const normalizedPartnerEmail = normalizeEmail(partnerEmail);
+
+  if (!normalizedPartnerEmail) {
+    const { data: cleared, error: clearError } = await adminDb
+      .from("users")
+      .update({
+        partner_email: null,
+        partner_id: null,
+      })
+      .eq("id", userId)
+      .select("partner_id, partner_email")
+      .single();
+
+    if (clearError) throw new Error(clearError.message);
+
+    return {
+      partner_id: cleared.partner_id,
+      partner_email: cleared.partner_email,
+      pending: false,
+    };
+  }
+
+  if (normalizedUserEmail && normalizedPartnerEmail === normalizedUserEmail) {
+    throw new Error("You cannot be your own partner");
+  }
+
+  const { data: partner, error: partnerLookupError } = await adminDb
+    .from("users")
+    .select("id")
+    .eq("email", normalizedPartnerEmail)
+    .maybeSingle();
+
+  if (partnerLookupError) {
+    throw new Error(partnerLookupError.message);
+  }
+
+  const { data: updated, error: updateError } = await adminDb
+    .from("users")
+    .update({
+      partner_email: normalizedPartnerEmail,
+      partner_id: partner?.id ?? null,
+    })
+    .eq("id", userId)
+    .select("partner_id, partner_email")
+    .single();
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return {
+    partner_id: updated.partner_id,
+    partner_email: updated.partner_email,
+    pending: partner == null,
+  };
+}
+
+async function syncPartnerLinksForUser(userId: string) {
+  const { data: user, error: userError } = await adminDb
+    .from("users")
+    .select("id, email, partner_email")
+    .eq("id", userId)
+    .single();
+
+  if (userError || !user) {
+    throw new Error("User not found");
+  }
+
+  const normalizedEmail = normalizeEmail(user.email);
+  if (!normalizedEmail) {
+    return {
+      linked_users: 0,
+      partner_id: null,
+      partner_email: user.partner_email,
+      pending: false,
+    };
+  }
+
+  const { data: linkedUsers, error: backfillError } = await adminDb
+    .from("users")
+    .update({
+      partner_id: userId,
+      partner_email: normalizedEmail,
+    })
+    .eq("partner_email", normalizedEmail)
+    .neq("id", userId)
+    .select("id");
+
+  if (backfillError) {
+    throw new Error(backfillError.message);
+  }
+
+  const ownLink = await setPartnerLink(userId, user.partner_email);
+
+  return {
+    linked_users: linkedUsers?.length ?? 0,
+    partner_id: ownLink.partner_id,
+    partner_email: ownLink.partner_email,
+    pending: ownLink.pending,
+  };
+}
+
 // ── Action handlers ─────────────────────────────────────────
 
 type ActionHandler = (
@@ -367,12 +497,14 @@ type ActionHandler = (
 const actions: Record<string, ActionHandler> = {
   // ── screenshots.log ──
   "screenshots.log": async (payload, callerId) => {
-    const { user_id, timestamp, rekognition_score, flagged, labels } = payload as {
+    const { user_id, timestamp, rekognition_score, flagged, labels, file_path, partner_id } = payload as {
       user_id: string;
       timestamp: string;
       rekognition_score: number;
       flagged: boolean;
       labels: string[] | null;
+      file_path?: string;
+      partner_id?: string;
     };
 
     if (!user_id) return errorResponse("user_id is required", 400);
@@ -388,6 +520,8 @@ const actions: Record<string, ActionHandler> = {
       rekognition_score,
       flagged,
       labels,
+      file_path: file_path || null,
+      partner_id: partner_id || null,
     });
 
     if (error) return errorResponse(error.message, 500);
@@ -507,7 +641,7 @@ const actions: Record<string, ActionHandler> = {
       return errorResponse("Cannot create checkout for another user", 403);
     }
 
-    const stripe = getStripe();
+    const stripe = await getStripe();
     if (!stripe) return errorResponse("Stripe not configured", 500);
 
     const priceId = PRICES[plan];
@@ -518,10 +652,6 @@ const actions: Record<string, ActionHandler> = {
         mode: "subscription",
         customer_email: email,
         line_items: [{ price: priceId, quantity: 1 }],
-        subscription_data: {
-          trial_period_days: 7,
-          metadata: { user_id },
-        },
         success_url:
           "https://getascension.app/billing/success?session_id={CHECKOUT_SESSION_ID}",
         cancel_url: "https://getascension.app/billing/cancel",
@@ -538,7 +668,7 @@ const actions: Record<string, ActionHandler> = {
   "billing.createPortalSession": async (payload, callerId) => {
     const { customer_id } = payload as { customer_id: string };
 
-    const stripe = getStripe();
+    const stripe = await getStripe();
     if (!stripe || !customer_id) return jsonResponse(null);
 
     // Verify the caller owns this Stripe customer ID
@@ -569,14 +699,26 @@ const actions: Record<string, ActionHandler> = {
 
     if (!base64Image) return errorResponse("base64Image is required", 400);
 
-    const client = getRekognition();
-    if (!client) {
+    const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID");
+    const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
+    if (!accessKeyId || !secretAccessKey) {
       // No AWS credentials — return clean result (dev mode)
       console.log("[API] No AWS credentials — skipping Rekognition analysis");
       return jsonResponse({ labels: [], maxConfidence: 0, raw: [] });
     }
 
     try {
+      // Dynamic import — avoids Deno cold-start crash from Node.js polyfills
+      // in @aws-sdk calling Deno.core.runMicrotasks() at module load time.
+      const { RekognitionClient, DetectModerationLabelsCommand } = await import(
+        "npm:@aws-sdk/client-rekognition@3.540.0"
+      );
+
+      const client = new RekognitionClient({
+        region: Deno.env.get("AWS_REGION") ?? "us-east-1",
+        credentials: { accessKeyId, secretAccessKey },
+      });
+
       // Decode base64 to Uint8Array
       const binaryStr = atob(base64Image);
       const bytes = new Uint8Array(binaryStr.length);
@@ -756,6 +898,49 @@ const actions: Record<string, ActionHandler> = {
 
     if (error) return errorResponse(error.message, 500);
     return jsonResponse({ success: true });
+  },
+
+  // ── users.linkPartner ──
+  "users.linkPartner": async (payload, callerId) => {
+    const { user_id, partner_email } = payload as {
+      user_id: string;
+      partner_email: string | null;
+    };
+
+    if (!user_id) {
+      return errorResponse("user_id is required", 400);
+    }
+
+    if (user_id !== callerId) {
+      return errorResponse("Cannot link partner for another user", 403);
+    }
+
+    try {
+      const result = await setPartnerLink(user_id, partner_email ?? null);
+      return jsonResponse({ success: true, ...result });
+    } catch (err) {
+      return errorResponse((err as Error).message, 400);
+    }
+  },
+
+  // ── users.syncPartnerLinks ──
+  "users.syncPartnerLinks": async (payload, callerId) => {
+    const { user_id } = payload as { user_id: string };
+
+    if (!user_id) {
+      return errorResponse("user_id is required", 400);
+    }
+
+    if (user_id !== callerId) {
+      return errorResponse("Cannot sync partner links for another user", 403);
+    }
+
+    try {
+      const result = await syncPartnerLinksForUser(user_id);
+      return jsonResponse({ success: true, ...result });
+    } catch (err) {
+      return errorResponse((err as Error).message, 400);
+    }
   },
 };
 

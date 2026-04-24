@@ -117,7 +117,18 @@ export default function SettingsPage() {
     if (!profile) return;
     setSaving(true);
 
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      setSaving(false);
+      router.push("/login");
+      return;
+    }
+
     const normalizedPartnerEmail = partnerEmail.trim().toLowerCase();
+    const currentPartnerEmail = (profile.partner_email || "").trim().toLowerCase();
+    const partnerChanged = normalizedPartnerEmail !== currentPartnerEmail;
 
     const { error: updateError } = await supabase
       .from("users")
@@ -125,11 +136,43 @@ export default function SettingsPage() {
       .eq("id", profile.id);
 
     if (!updateError) {
+      let linkedPartnerEmail = profile.partner_email;
+
       try {
         await linkPartner(profile.id, normalizedPartnerEmail || null);
+        linkedPartnerEmail = normalizedPartnerEmail || null;
+
+        if (
+          partnerChanged &&
+          normalizedPartnerEmail &&
+          typeof window !== "undefined" &&
+          window.ascension?.invitePartner
+        ) {
+          await window.ascension.invitePartner(
+            normalizedPartnerEmail,
+            name.trim() || profile.name || "Your partner",
+            {
+              inviterUserId: profile.id,
+              accessToken: session.access_token,
+              supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+              supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            },
+          );
+        }
       } catch (err) {
         console.error("[Settings] Failed to link partner:", err);
       }
+
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              name,
+              goals,
+              partner_email: linkedPartnerEmail,
+            }
+          : current,
+      );
     }
 
     setSaving(false);

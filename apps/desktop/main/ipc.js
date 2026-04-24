@@ -83,9 +83,29 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
     return await sendAlertEmail(type, partnerEmail, userName, data);
   });
 
-  ipcMain.handle("alert:invite-partner", async (_, { partnerEmail, userName }) => {
+  ipcMain.handle("alert:invite-partner", async (_, {
+    partnerEmail,
+    userName,
+    inviterUserId,
+    accessToken,
+    supabaseUrl,
+    supabaseAnonKey,
+  }) => {
+    if (typeof partnerEmail !== "string" || typeof userName !== "string") {
+      return { error: "Invalid invitation parameters" };
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) {
+      return { error: "Invalid email address" };
+    }
+    if (typeof supabaseUrl === "string" && supabaseUrl.length > 0) {
+      setSupabaseConfig(supabaseUrl, typeof supabaseAnonKey === "string" ? supabaseAnonKey : "");
+    }
+    if (typeof accessToken === "string" && accessToken.length > 0) {
+      setAccessToken(accessToken);
+    }
     return await sendAlertEmail("partner_invitation", partnerEmail, userName, {
       signupUrl: "https://getascension.app/signup",
+      inviteCode: typeof inviterUserId === "string" ? inviterUserId : "",
     });
   });
 

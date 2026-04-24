@@ -21,15 +21,17 @@ export default function OnboardingPartner() {
       return;
     }
 
+    const normalizedPartnerEmail = partnerEmail.trim().toLowerCase();
+
     // Can't be your own partner
-    if (partnerEmail === session.user.email) {
+    if (normalizedPartnerEmail === session.user.email?.trim().toLowerCase()) {
       setError("You can't be your own accountability partner");
       setLoading(false);
       return;
     }
 
     try {
-      await linkPartner(session.user.id, partnerEmail.trim().toLowerCase());
+      await linkPartner(session.user.id, normalizedPartnerEmail);
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -45,8 +47,14 @@ export default function OnboardingPartner() {
         .single();
 
       await window.ascension.invitePartner(
-        partnerEmail,
-        userProfile?.name || "Your partner"
+        normalizedPartnerEmail,
+        userProfile?.name || "Your partner",
+        {
+          inviterUserId: session.user.id.toString(),
+          accessToken: session.access_token,
+          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        },
       );
     }
 

@@ -146,6 +146,13 @@ export interface Database {
   };
 }
 
+export interface InvitePartnerAuthContext {
+  inviterUserId?: string;
+  accessToken?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+}
+
 // Electron IPC bridge type
 declare global {
   interface Window {
@@ -165,7 +172,11 @@ declare global {
       }>;
       // Alerts
       sendAlert: (type: string, partnerEmail: string, userName: string, data: Record<string, unknown>) => Promise<unknown>;
-      invitePartner: (partnerEmail: string, userName: string) => Promise<unknown>;
+      invitePartner: (
+        partnerEmail: string,
+        userName: string,
+        authContext?: InvitePartnerAuthContext,
+      ) => Promise<unknown>;
       // Streak
       getStreak: (userId: string) => Promise<{
         current_streak: number;

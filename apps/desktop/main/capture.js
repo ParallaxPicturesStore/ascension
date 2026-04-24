@@ -171,6 +171,7 @@ async function captureAndAnalyze() {
           rekognition_score: maxConfidence,
           flagged,
           labels: analysis.labels,
+          partner_id:user.partner_id
         },
         token,
       ).catch((err) =>
