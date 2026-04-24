@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform, Modal } from 'react-native';
+import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform, Modal, Linking, Alert as RNAlert } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ScreenLayout,
@@ -33,6 +33,7 @@ export default function DashboardScreen() {
   const [error, setError] = useState<string | null>(null);
   const [vpnStatus, setVpnStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'error'>('disconnected');
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [subscriptionBlockReason, setSubscriptionBlockReason] = useState<'expired' | 'cancelled' | 'trial_expired' | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -47,9 +48,18 @@ export default function DashboardScreen() {
         api.users.getProfile(user.id),
       ]);
 
-      const expired = isSubscriptionExpired(profile.subscription_lapse_date)
-        || profile.subscription_status === 'expired';
-      setSubscriptionExpired(expired);
+      const lapseExpired = isSubscriptionExpired(profile.subscription_lapse_date);
+      const status = profile.subscription_status;
+      let blockReason: 'expired' | 'cancelled' | 'trial_expired' | null = null;
+      if (status === 'cancelled') {
+        blockReason = 'cancelled';
+      } else if (status === 'trial' && lapseExpired) {
+        blockReason = 'trial_expired';
+      } else if (status === 'expired' || lapseExpired) {
+        blockReason = 'expired';
+      }
+      setSubscriptionExpired(blockReason !== null);
+      setSubscriptionBlockReason(blockReason);
 
       setStreak(streakData);
       setAlerts(alertsData.slice(0, 5));
@@ -87,6 +97,25 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [loadData]);
 
+  const handleManageSubscription = useCallback(async () => {
+    if (!user) return;
+    try {
+      const customerId = await api.billing.getCustomerId(user.id);
+      if (!customerId) {
+        RNAlert.alert('No Subscription', 'No active subscription found to manage.');
+        return;
+      }
+      const session = await api.billing.createPortalSession(customerId);
+      if (!session?.url) {
+        RNAlert.alert('Error', 'Could not open subscription portal. Please try again.');
+        return;
+      }
+      await Linking.openURL(session.url);
+    } catch {
+      RNAlert.alert('Error', 'Failed to open subscription portal.');
+    }
+  }, [api, user]);
+
   const monitoringActive = Platform.OS === 'ios'
     ? vpnStatus === 'connected'
     : true; // Android monitoring managed by MonitoringService
@@ -118,18 +147,38 @@ export default function DashboardScreen() {
   }
 
   if (subscriptionExpired) {
+    const modalTitle =
+      subscriptionBlockReason === 'trial_expired'
+        ? 'Trial Expired'
+        : subscriptionBlockReason === 'cancelled'
+        ? 'Subscription Cancelled'
+        : 'Subscription Ended';
+
+    const modalBody =
+      subscriptionBlockReason === 'trial_expired'
+        ? 'Your 7-day free trial has expired. Subscribe to keep monitoring active and your partner informed.'
+        : subscriptionBlockReason === 'cancelled'
+        ? 'You have cancelled your subscription. Monitoring has been paused. Renew to keep your partner informed.'
+        : 'Your subscription has ended, so screen sharing and monitoring are turned off.';
+
+    const modalButtonTitle =
+      subscriptionBlockReason === 'trial_expired' ? 'View Plans' : 'Manage Subscription';
+
+    const handleModalAction =
+      subscriptionBlockReason === 'trial_expired'
+        ? () => router.push('/pricing')
+        : handleManageSubscription;
+
     return (
       <ScreenLayout title="Dashboard" scrollable={false}>
         <Modal visible transparent animationType="fade">
           <View style={styles.subscriptionModalOverlay}>
             <Card style={styles.subscriptionModalCard}>
-              <Text style={styles.subscriptionModalTitle}>Subscription Ended</Text>
-              <Text style={styles.subscriptionModalBody}>
-                Your subscription has ended, so screen sharing and monitoring are turned off.
-              </Text>
+              <Text style={styles.subscriptionModalTitle}>{modalTitle}</Text>
+              <Text style={styles.subscriptionModalBody}>{modalBody}</Text>
               <Button
-                title="Manage Subscription"
-                onPress={() => router.push('/pricing')}
+                title={modalButtonTitle}
+                onPress={handleModalAction}
                 style={styles.subscriptionModalButton}
               />
             </Card>
