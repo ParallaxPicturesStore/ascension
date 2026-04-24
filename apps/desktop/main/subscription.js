@@ -142,11 +142,11 @@ async function checkSubscription() {
       // Clear lapse data if they've resubscribed after a lapse
       if (user.subscription_lapse_date) {
         const token = getAccessToken();
-        if (token) {
-          await callEdgeFunction("subscription.clearLapse", {
-            user_id: user.id,
-          }, token).catch((err) => console.error("[Subscription] Failed to clear lapse:", err.message));
-        }
+        // if (token) {
+        //   await callEdgeFunction("subscription.clearLapse", {
+        //     user_id: user.id,
+        //   }, token).catch((err) => console.error("[Subscription] Failed to clear lapse:", err.message));
+        // }
         console.log(`[Subscription] User ${user.id} resubscribed — lapse data cleared`);
       }
     }

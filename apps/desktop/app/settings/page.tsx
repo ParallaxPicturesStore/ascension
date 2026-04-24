@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { linkPartner, supabase } from "@/lib/supabase";
+import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import {
   ArrowLeft,
   User,
@@ -19,7 +20,9 @@ interface UserProfile {
   name: string;
   email: string;
   partner_email: string | null;
+  stripe_customer_id: string | null;
   subscription_status: string;
+  subscription_lapse_date: string | null;
   goals: string | null;
 }
 
@@ -34,12 +37,34 @@ export default function SettingsPage() {
   const [quitPassword, setQuitPassword] = useState("");
   const [quitError, setQuitError] = useState("");
   const [quitting, setQuitting] = useState(false);
+  const effectiveSubscriptionStatus = getEffectiveSubscriptionStatus(
+    profile?.subscription_status || "trial",
+    profile?.subscription_lapse_date || null,
+  );
 
   useEffect(() => {
-    loadProfile();
+    loadProfile(true);
+
+    const refreshOnReturn = () => {
+      loadProfile(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadProfile(false);
+      }
+    };
+
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
-  async function loadProfile() {
+  async function loadProfile(syncFormFields = false) {
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -55,12 +80,37 @@ export default function SettingsPage() {
       .single();
 
     if (data) {
-      setProfile(data as UserProfile);
-      setName(data.name || "");
-      setPartnerEmail(data.partner_email || "");
-      setGoals(data.goals || "");
+      const nextProfile = data as UserProfile;
+      setProfile(nextProfile);
+
+      if (syncFormFields) {
+        setName(nextProfile.name || "");
+        setPartnerEmail(nextProfile.partner_email || "");
+        setGoals(nextProfile.goals || "");
+      }
+
+      setLoading(false);
+      return nextProfile;
     }
+
     setLoading(false);
+    return null;
+  }
+
+  async function pollForSubscriptionChange(currentStatus: string) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const nextProfile = await loadProfile(false);
+      const nextStatus = getEffectiveSubscriptionStatus(
+        nextProfile?.subscription_status || "trial",
+        nextProfile?.subscription_lapse_date || null,
+      );
+
+      if (nextProfile && nextStatus !== currentStatus) {
+        return;
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 3000));
+    }
   }
 
   async function saveProfile() {
@@ -83,6 +133,50 @@ export default function SettingsPage() {
     }
 
     setSaving(false);
+  }
+
+  async function handleSubscriptionAction() {
+    if (!profile) return;
+
+    if (effectiveSubscriptionStatus === "trial") {
+      router.push("/pricing");
+      return;
+    }
+
+    try {
+      let customerId = profile.stripe_customer_id;
+
+      if (!customerId) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("stripe_customer_id")
+          .eq("id", profile.id)
+          .single();
+
+        if (error) throw error;
+        customerId = data?.stripe_customer_id ?? null;
+      }
+
+      if (!customerId) {
+        window.alert("No active subscription found to manage.");
+        return;
+      }
+
+      if (!window.ascension) {
+        window.alert("Please use the desktop app to manage your subscription.");
+        return;
+      }
+
+      const result = await window.ascension.openBillingPortal(customerId);
+      if (!result?.success) {
+        window.alert("Could not open subscription portal. Please try again.");
+        return;
+      }
+
+      void pollForSubscriptionChange(effectiveSubscriptionStatus);
+    } catch {
+      window.alert("Failed to open subscription portal.");
+    }
   }
 
   if (loading) {
@@ -197,17 +291,15 @@ export default function SettingsPage() {
           <div className="flex justify-between items-center">
             <div>
               <div className="text-sm capitalize">
-                {profile?.subscription_status || "Trial"}
+                {effectiveSubscriptionStatus || "trial"}
               </div>
               <div className="text-xs text-muted">Current plan</div>
             </div>
             <button
-              onClick={() => router.push("/pricing")}
+              onClick={handleSubscriptionAction}
               className="text-xs text-accent hover:underline"
             >
-              {profile?.subscription_status === "active"
-                ? "Manage"
-                : "Upgrade"}
+              {effectiveSubscriptionStatus === "trial" ? "Upgrade" : "Manage"}
             </button>
           </div>
         </div>

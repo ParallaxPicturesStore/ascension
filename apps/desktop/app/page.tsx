@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, syncPartnerLinks } from "@/lib/supabase";
+import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import StreakCounter from "@/components/StreakCounter";
 import StatusIndicator from "@/components/StatusIndicator";
 import AlertList from "@/components/AlertList";
@@ -10,10 +11,13 @@ import { Settings, LogOut, CreditCard, Users, Flame } from "lucide-react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 
 interface UserProfile {
+  id: string;
   name: string;
   email: string;
   partner_email: string | null;
+  stripe_customer_id: string | null;
   subscription_status: string;
+  subscription_lapse_date: string | null;
 }
 
 export default function Dashboard() {
@@ -37,18 +41,44 @@ export default function Dashboard() {
     blockedCount: 0,
     flaggedCount: 0,
   });
+  const effectiveSubscriptionStatus = getEffectiveSubscriptionStatus(
+    user?.subscription_status || "trial",
+    user?.subscription_lapse_date || null,
+  );
 
   useEffect(() => {
     checkAuth();
     setupCaptureListener();
+
+    const refreshOnReturn = () => {
+      checkAuth();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAuth();
+      }
+    };
+
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Remote kill switch — redirect to locked screen if admin disables the account
     if (typeof window !== "undefined" && window.ascension?.onSubscriptionLocked) {
       const unsub = window.ascension.onSubscriptionLocked(() => {
         router.push("/locked");
       });
-      return unsub;
+      return () => {
+        window.removeEventListener("focus", refreshOnReturn);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        unsub();
+      };
     }
+
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   async function checkAuth() {
@@ -88,10 +118,13 @@ export default function Dashboard() {
     }
 
     setUser({
+      id: profile.id,
       name: profile.name,
       email: profile.email,
       partner_email: profile.partner_email,
+      stripe_customer_id: profile.stripe_customer_id,
       subscription_status: profile.subscription_status,
+      subscription_lapse_date: profile.subscription_lapse_date,
     });
 
     // Fetch streak
@@ -172,7 +205,12 @@ export default function Dashboard() {
   }
 
   return (
-    <SubscriptionGate subscriptionStatus={user?.subscription_status || "trial"}>
+    <SubscriptionGate
+      subscriptionStatus={effectiveSubscriptionStatus}
+      userId={user?.id ?? null}
+      stripeCustomerId={user?.stripe_customer_id ?? null}
+      subscriptionLapseDate={user?.subscription_lapse_date ?? null}
+    >
     <div className="min-h-screen bg-background p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
@@ -261,7 +299,7 @@ export default function Dashboard() {
           className="flex items-center gap-2 bg-card-bg border border-card-border rounded-xl p-3 text-sm text-muted hover:text-foreground transition-colors"
         >
           <CreditCard className="w-4 h-4" />
-          {user?.subscription_status === "active" ? "Plan" : "Upgrade"}
+          {effectiveSubscriptionStatus === "active" ? "Plan" : "Upgrade"}
         </button>
       </div>
 
