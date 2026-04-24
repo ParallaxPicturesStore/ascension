@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenLayout, Input, Button, Card, theme } from '@ascension/ui';
 import { useApi } from '../../src/hooks/useApi';
@@ -55,10 +55,6 @@ export default function OnboardingPartnerScreen() {
     }
   };
 
-  const handleNext = () => {
-    router.push('/onboarding/confirm');
-  };
-
   return (
     <ScreenLayout title="Invite a Partner">
       <Text style={styles.stepIndicator}>Step 2 of 3</Text>
@@ -111,14 +107,6 @@ export default function OnboardingPartnerScreen() {
           />
         </View>
       )}
-
-      <View style={styles.actions}>
-        <Button
-          title={sent ? 'Continue' : 'Skip for now'}
-          variant={sent ? 'primary' : 'ghost'}
-          onPress={handleNext}
-        />
-      </View>
     </ScreenLayout>
   );
 }
@@ -189,8 +177,5 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.body,
     color: theme.colors.success,
     lineHeight: 22,
-  },
-  actions: {
-    marginTop: theme.spacing.lg,
   },
 });
