@@ -1,6 +1,6 @@
 const { ipcMain, app, shell } = require("electron");
 const { getDb, callEdgeFunction, setAccessToken, getAccessToken, setSupabaseConfig } = require("./api-client");
-const { pauseCapture, resumeCapture, getCaptureState } = require("./capture");
+const { pauseCapture, resumeCapture, getCaptureState, stopCapture, clearCurrentUser } = require("./capture");
 const { sendAlertEmail } = require("./alerts");
 const { getStreak, resetStreak, getWeeklyStats } = require("./streak");
 const { createCheckoutSession, getSubscriptionStatus, createCustomerPortalSession } = require("./billing");
@@ -203,6 +203,15 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
       setAccessToken(accessToken);
     }
     if (onUserLoggedIn) onUserLoggedIn(userId);
+    return { ok: true };
+  });
+
+  // Notify main process that user has logged out — stop capture and clear user state
+  ipcMain.handle("user:logged-out", () => {
+    console.log("[IPC] User logged out — stopping capture");
+    currentUserId = null;
+    clearCurrentUser();
+    stopCapture();
     return { ok: true };
   });
 

@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld("ascension", {
   notifyLoggedIn: (userId, accessToken, supabaseUrl, supabaseAnonKey) =>
     ipcRenderer.invoke("user:logged-in", userId, accessToken, supabaseUrl, supabaseAnonKey),
 
+  // Notify main process of logout — stops capture and clears user state
+  notifyLoggedOut: () => ipcRenderer.invoke("user:logged-out"),
+
   // Send updated access token (e.g. after token refresh)
   updateToken: (accessToken) => ipcRenderer.invoke("user:update-token", accessToken),
 

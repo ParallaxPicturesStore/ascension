@@ -188,6 +188,9 @@ export default function PartnerDashboard() {
         </div>
         <button
           onClick={async () => {
+            if (typeof window !== "undefined" && (window as any).ascension?.notifyLoggedOut) {
+              await (window as any).ascension.notifyLoggedOut();
+            }
             await supabase.auth.signOut();
             router.push("/login");
           }}

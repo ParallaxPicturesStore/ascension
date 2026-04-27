@@ -109,6 +109,10 @@ async function getCurrentUser() {
 
 async function captureAndAnalyze() {
   if (captureState !== "active") return;
+  if (!currentUserId) {
+    console.log("[Capture] Skipping — no user logged in");
+    return;
+  }
 
   try {
     const imgBuffer = await captureScreen();
@@ -271,6 +275,12 @@ function setCurrentUserId(userId) {
   currentUserId = userId;
 }
 
+function clearCurrentUser() {
+  currentUserId = null;
+  currentUserCache = null;
+  console.log("[Capture] User cleared — capture will skip until next login");
+}
+
 function startCapture(mainWindow) {
   if (mainWindow) mainWindowRef = mainWindow;
   captureState = "active";
@@ -364,4 +374,5 @@ module.exports = {
   getCaptureState,
   setCurrentUserId,
   setCurrentUser,
+  clearCurrentUser,
 };

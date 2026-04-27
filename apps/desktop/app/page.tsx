@@ -200,6 +200,9 @@ export default function Dashboard() {
   }
 
   async function handleLogout() {
+    if (typeof window !== "undefined" && (window as any).ascension?.notifyLoggedOut) {
+      await (window as any).ascension.notifyLoggedOut();
+    }
     await supabase.auth.signOut();
     router.push("/login");
   }

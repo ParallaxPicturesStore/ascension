@@ -40,7 +40,7 @@ try {
 } catch (_) {}
 
 const { createTray } = require("./tray");
-const { startCapture, setCurrentUserId, setCurrentUser } = require("./capture");
+const { startCapture, setCurrentUserId, setCurrentUser, getCaptureState } = require("./capture");
 const { registerIpcHandlers } = require("./ipc");
 const { setupAutoLaunch, setupProtection } = require("./protection");
 const { startDailyStreakUpdate } = require("./streak");
@@ -312,6 +312,12 @@ async function onUserLoggedIn(userId) {
   initSubscriptionCheck(userId, mainWindow).catch((err) => {
     console.error("[Main] Subscription check failed:", err.message);
   });
+
+  // Restart capture engine if it was stopped by a previous logout
+  if (getCaptureState() === "stopped") {
+    console.log("[Main] Restarting capture engine after login");
+    startCapture(mainWindow);
+  }
 }
 
 app.whenReady().then(async () => {
