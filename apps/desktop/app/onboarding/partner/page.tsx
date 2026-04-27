@@ -15,7 +15,10 @@ export default function OnboardingPartner() {
     setError("");
     setLoading(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
     if (!session) {
       router.push("/login");
       return;
@@ -32,30 +35,40 @@ export default function OnboardingPartner() {
 
     try {
       await linkPartner(session.user.id, normalizedPartnerEmail);
-    } catch {
+    } catch (err) {
+      console.error("[Onboarding] Failed to link partner:", err);
       setError("Something went wrong. Please try again.");
       setLoading(false);
       return;
     }
 
     // Send invitation email to partner via Electron IPC -> Resend
-    if (typeof window !== "undefined" && window.ascension?.invitePartner) {
-      const { data: userProfile } = await supabase
-        .from("users")
-        .select("name")
-        .eq("id", session.user.id)
-        .single();
+    // Wrapped in try-catch like settings — invite failure is non-blocking
+    try {
+      if (
+        normalizedPartnerEmail &&
+        typeof window !== "undefined" &&
+        window.ascension?.invitePartner
+      ) {
+        const { data: userProfile } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", session.user.id)
+          .single();
 
-      await window.ascension.invitePartner(
-        normalizedPartnerEmail,
-        userProfile?.name || "Your partner",
-        {
-          inviterUserId: session.user.id.toString(),
-          accessToken: session.access_token,
-          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        },
-      );
+        await window.ascension.invitePartner(
+          normalizedPartnerEmail,
+          userProfile?.name || "Your partner",
+          {
+            inviterUserId: session.user.id,
+            accessToken: session.access_token,
+            supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          },
+        );
+      }
+    } catch (err) {
+      console.error("[Onboarding] Failed to send partner invite:", err);
     }
 
     router.push("/onboarding/confirm");

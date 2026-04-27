@@ -102,12 +102,10 @@ export default function Dashboard() {
       .eq("id", session.user.id)
       .single();
 
-    if (!profile?.name) {
-      router.push("/onboarding");
-      return;
-    }
-
     // Notify Electron main process - starts watchdog
+    // Must happen before any early returns so new users going through
+    // onboarding also have an access token in the main process (needed
+    // for sending the partner invite email from the onboarding partner page).
     if (typeof window !== "undefined" && window.ascension?.notifyLoggedIn) {
       window.ascension.notifyLoggedIn(
         session.user.id,
@@ -115,6 +113,11 @@ export default function Dashboard() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       );
+    }
+
+    if (!profile?.name) {
+      router.push("/onboarding");
+      return;
     }
 
     setUser({
