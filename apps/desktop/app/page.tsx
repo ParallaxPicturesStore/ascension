@@ -135,9 +135,17 @@ export default function Dashboard() {
       .single();
 
     if (streakData) {
+      let currentStreak = 0;
+      if (streakData.streak_started_at) {
+        const start = new Date(streakData.streak_started_at);
+        const now = new Date();
+        start.setHours(0, 0, 0, 0);
+        now.setHours(0, 0, 0, 0);
+        currentStreak = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      }
       setStreak({
-        current: streakData.current_streak,
-        longest: streakData.longest_streak,
+        current: currentStreak,
+        longest: Math.max(currentStreak, streakData.longest_streak ?? 0),
       });
     }
 

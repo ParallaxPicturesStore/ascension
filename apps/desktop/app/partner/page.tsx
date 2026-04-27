@@ -39,6 +39,7 @@ interface Streak {
   current_streak: number;
   longest_streak: number;
   last_relapse_date: string | null;
+  streak_started_at: string | null;
 }
 
 export default function PartnerDashboard() {
@@ -130,6 +131,15 @@ export default function PartnerDashboard() {
     });
   }
 
+  function streakDays(startedAt: string | null): number {
+    if (!startedAt) return 0;
+    const start = new Date(startedAt);
+    const now = new Date();
+    start.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -190,7 +200,7 @@ export default function PartnerDashboard() {
       {/* Streak card */}
       <div className="bg-card-bg border border-card-border rounded-xl p-6 text-center mb-6">
         <div className="text-5xl font-bold tabular-nums">
-          {streak?.current_streak ?? 0}
+          {streakDays(streak?.streak_started_at ?? null)}
         </div>
         <div className="text-muted text-xs mt-1 uppercase tracking-wider">
           days clean
@@ -198,7 +208,7 @@ export default function PartnerDashboard() {
         <div className="flex justify-center gap-6 mt-4">
           <div className="text-center">
             <TrendingUp className="w-4 h-4 text-accent mx-auto mb-1" />
-            <div className="text-sm font-semibold">{streak?.longest_streak ?? 0}</div>
+            <div className="text-sm font-semibold">{Math.max(streakDays(streak?.streak_started_at ?? null), streak?.longest_streak ?? 0)}</div>
             <div className="text-xs text-muted">Best</div>
           </div>
           <div className="text-center">

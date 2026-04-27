@@ -340,7 +340,7 @@ async function pauseCapture() {
   }
 }
 
-function resumeCapture() {
+async function resumeCapture() {
   captureState = "active";
   console.log("[Capture] Engine resumed");
 
