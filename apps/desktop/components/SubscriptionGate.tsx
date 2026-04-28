@@ -13,7 +13,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-const LOCKED_STATUSES = ["expired", "past_due"];
+const LOCKED_STATUSES = ["expired", "past_due", "trial_expired"];
 
 export default function SubscriptionGate({
   subscriptionStatus,
@@ -29,7 +29,7 @@ export default function SubscriptionGate({
   );
 
   async function handleSubscriptionAction() {
-    if (effectiveSubscriptionStatus === "trial") {
+    if (effectiveSubscriptionStatus === "trial" || effectiveSubscriptionStatus === "trial_expired") {
       router.push("/pricing");
       return;
     }
@@ -68,6 +68,8 @@ export default function SubscriptionGate({
   }
 
   if (LOCKED_STATUSES.includes(effectiveSubscriptionStatus)) {
+    const isTrialExpired = effectiveSubscriptionStatus === "trial_expired";
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-sm text-center">
@@ -75,19 +77,22 @@ export default function SubscriptionGate({
             <Lock className="w-6 h-6 text-muted" />
           </div>
 
-          <h1 className="text-xl font-bold mb-2">Subscription Paused</h1>
+          <h1 className="text-xl font-bold mb-2">
+            {isTrialExpired ? "Your Free Trial Has Ended" : "Subscription Paused"}
+          </h1>
           <p className="text-sm text-muted mb-6 leading-relaxed">
-            Your Ascension subscription is{" "}
-            {effectiveSubscriptionStatus === "past_due" ? "past due" : "expired"}.
-            Monitoring has been paused. Renew to keep your partner informed and
-            your streak protected.
+            {isTrialExpired
+              ? "Your 7-day free trial has expired. Subscribe to continue monitoring and keep your partner informed."
+              : `Your Ascension subscription is ${
+                  effectiveSubscriptionStatus === "past_due" ? "past due" : "expired"
+                }. Monitoring has been paused. Renew to keep your partner informed and your streak protected.`}
           </p>
 
           <button
             onClick={handleSubscriptionAction}
             className="w-full bg-accent hover:bg-accent-hover text-white font-semibold py-3 rounded-lg transition-colors text-sm mb-3"
           >
-            {effectiveSubscriptionStatus === "trial" ? "Subscribe" : "Renew Subscription"}
+            {isTrialExpired ? "Choose a Plan" : "Renew Subscription"}
           </button>
 
           <p className="text-xs text-muted">
