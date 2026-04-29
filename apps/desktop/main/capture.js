@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { getDb, callEdgeFunction, getAccessToken } = require("./api-client");
+const { getDb, getAuthDb, callEdgeFunction, getAccessToken } = require("./api-client");
 const { analyzeImage } = require("./rekognition");
 const { analyzeLocally } = require("./local-analyzer");
 const { isRekognitionEnabled } = require("./subscription");
@@ -113,7 +113,7 @@ async function uploadScreenshotToStorage(userId, timestamp, buffer) {
 
 // Get the current user's info for alert context (anon key — RLS allows own row)
 async function getCurrentUser() {
-  if (currentUserCache) return currentUserCache;
+  if (cachedUser) return cachedUser;
 
   // Use getAuthDb() to bypass RLS for our own record
   const db = getAuthDb() || getDb();
@@ -134,7 +134,7 @@ async function getCurrentUser() {
     console.error("[Capture] Failed to fetch current user:", error.message);
     return null;
   }
-if(data)currentUserCache = data;
+if (data) cachedUser = data;
   return data;
 }
 
@@ -331,7 +331,7 @@ function setCurrentUser(user) {
 
 function clearCurrentUser() {
   currentUserId = null;
-  currentUserCache = null;
+  cachedUser = null;
   console.log("[Capture] User cleared — capture will skip until next login");
 }
 
