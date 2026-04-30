@@ -12,7 +12,6 @@ import {
   theme,
 } from '@ascension/ui';
 import type { Alert, Streak, ScreenshotStats, WeeklyStats } from '@ascension/api';
-import { calculateStreak } from '@ascension/shared';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 import { vpnManager } from '../src/native/VPNManager';
@@ -212,7 +211,7 @@ export default function DashboardScreen() {
       {/* Streak */}
       <Card style={styles.streakCard}>
         <StreakCounter
-          currentStreak={calculateStreak(streak?.streak_started_at) ?? 0}
+          currentStreak={streak?.current_streak ?? 0}
           longestStreak={streak?.longest_streak ?? 0}
         />
       </Card>
