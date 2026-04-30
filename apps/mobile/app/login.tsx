@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenLayout, Input, Button, BackButton, theme } from '@ascension/ui';
 import { useAuth } from '../src/hooks/useAuth';
@@ -7,6 +7,18 @@ import { useAuth } from '../src/hooks/useAuth';
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
+
+  const handleBackPress = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    if (Platform.OS === 'android') {
+      BackHandler.exitApp();
+      return;
+    }
+    router.replace('/');
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,7 +55,7 @@ export default function LoginScreen() {
       >
       <View style={styles.container}>
         <View style={styles.topSection}>
-          <BackButton onPress={() => router.back()} style={styles.backButton} />
+          <BackButton onPress={handleBackPress} style={styles.backButton} />
 
           <View style={styles.header}>
             <Text style={styles.logo}>Ascension</Text>
