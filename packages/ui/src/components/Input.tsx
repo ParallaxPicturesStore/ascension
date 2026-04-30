@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   container: { marginBottom: theme.spacing.base },
   label: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.fontSize.body,
+    fontSize: theme.fontSize.bodyLg,
     fontWeight: theme.fontWeight.semiBold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,

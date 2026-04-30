@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenLayout, Input, Button, BackButton, theme } from '@ascension/ui';
 import { useAuth } from '../src/hooks/useAuth';
@@ -60,71 +60,77 @@ export default function SignupScreen() {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.container}>
-          <View style={styles.topSection}>
-            <BackButton onPress={() => router.back()} style={styles.backButton} />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            <View style={styles.topSection}>
+              <BackButton onPress={() => router.back()} style={styles.backButton} />
 
-            <View style={styles.header}>
-              <Text style={styles.logo}>Ascension</Text>
-              <Text style={styles.subtitle}>Start your journey. Take back control.</Text>
+              <View style={styles.header}>
+                <Text style={styles.logo}>Ascension</Text>
+                <Text style={styles.subtitle}>Start your journey. Take back control.</Text>
+              </View>
+            </View>
+
+            <View style={styles.form}>
+              <Input
+                label="Email address"
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+              />
+
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                textContentType="newPassword"
+              />
+
+              <Input
+                label="Confirm password"
+                placeholder="Repeat your password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                textContentType="newPassword"
+              />
+
+              {error && <Text style={styles.error}>{error}</Text>}
+
+              {emailSent ? (
+                <Text style={styles.successText}>
+                  A confirmation email has been sent to {email}. Please verify your email then sign in.
+                </Text>
+              ) : (
+                <Button
+                  title={loading ? 'Creating account...' : 'Create account'}
+                  onPress={handleSignUp}
+                  disabled={loading}
+                  style={styles.button}
+                />
+              )}
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account?</Text>
+              <TouchableOpacity onPress={() => router.push('/login')}>
+                <Text style={styles.link}>Sign in</Text>
+              </TouchableOpacity>
             </View>
           </View>
-
-          <View style={styles.form}>
-            <Input
-              label="Email address"
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-            />
-
-            <Input
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-            />
-
-            <Input
-              label="Confirm password"
-              placeholder="Repeat your password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-            />
-
-            {error && <Text style={styles.error}>{error}</Text>}
-
-            {emailSent ? (
-              <Text style={styles.successText}>
-                A confirmation email has been sent to {email}. Please verify your email then sign in.
-              </Text>
-            ) : (
-              <Button
-                title={loading ? 'Creating account...' : 'Create account'}
-                onPress={handleSignUp}
-                disabled={loading}
-                style={styles.button}
-              />
-            )}
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account?</Text>
-            <TouchableOpacity onPress={() => router.push('/login')}>
-              <Text style={styles.link}>Sign in</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </ScreenLayout>
   );
@@ -133,6 +139,9 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   container: {
     flex: 1,
