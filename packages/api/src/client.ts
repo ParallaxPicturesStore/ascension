@@ -299,26 +299,18 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
     },
 
     async getPartnerData(userId) {
-      // Get the user's partner_id first
-        console.log("User : " , userId);
-      
-      const user={
-        partner_id:userId
-      }
-
-      console.log("user_id : ", user.partner_id);
-      
-      if (!user?.partner_id) return null;
+      // In ally flows, monitored user rows store partner_id = ally user id.
+      // So we locate the monitored user by matching partner_id to the ally id.
+      if (!userId) return null;
 
       // Fetch partner profile (RLS allows partner reads)      
       const { data: partner, error: partnerError } = await supabase
         .from('users')
         .select('id, name, email, subscription_status')
-        .eq('partner_id', user.partner_id)
+        .eq('partner_id', userId)
         .single();
-        console.log("userId , username, useremail : " , userId, partner?.name, partner?.email);
-      console.log("partner data : " , partner);
-console.log(partnerError);
+
+      if (partnerError) throw new Error(partnerError.message);
 
       if (!partner) return null;
 
@@ -326,7 +318,7 @@ console.log(partnerError);
       const { data: streak } = await supabase
         .from('streaks')
         .select('*')
-        .eq('user_id', user.partner_id)
+        .eq('user_id', partner.id)
         .single();
 
       // Fetch recent alerts for this partner
