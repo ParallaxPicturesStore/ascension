@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { theme, ScreenLayout, Card, StreakCounter, Button, SectionHeader } from '@ascension/ui';
-import { formatStreakDisplay, calculateStreak } from '@ascension/shared';
+import { formatStreakDisplay } from '@ascension/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
 
@@ -22,7 +22,7 @@ export default function StreakScreen() {
   const { session } = useAuth();
   const { partner, streak, weeklyStats, loading } = usePartner(session?.user?.id);
 
-  const currentStreak = streak ? calculateStreak(streak.streak_started_at) : 0;
+  const currentStreak = streak?.current_streak ?? 0;
   const longestStreak = streak?.longest_streak ?? 0;
   const partnerName = partner?.name ?? 'Your partner';
 
