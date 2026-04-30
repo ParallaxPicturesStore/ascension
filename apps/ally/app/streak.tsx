@@ -23,7 +23,7 @@ export default function StreakScreen() {
   const { partner, streak, weeklyStats, loading } = usePartner(session?.user?.id);
 
   const currentStreak = streak?.current_streak ?? 0;
-  const longestStreak = streak?.longest_streak ?? 0;
+  const longestStreak = Math.max(streak?.longest_streak ?? 0, currentStreak);
   const partnerName = partner?.name ?? 'Your partner';
 
   return (

@@ -494,6 +494,64 @@ const actions: Record<string, ActionHandler> = {
     return jsonResponse(updated);
   },
 
+  // ── streaks.syncLongest ──
+  "streaks.syncLongest": async (payload, callerId) => {
+    const { user_id } = payload as {
+      user_id: string;
+      current_streak?: number;
+      longest_streak?: number;
+    };
+
+    if (!user_id) return errorResponse("user_id is required", 400);
+
+    // Allow the user themselves OR their registered accountability partner.
+    if (user_id !== callerId) {
+      // Check whether callerId is the partner linked to user_id.
+      // The monitored user's row stores partner_id = ally's user id.
+      const { data: linkCheck } = await adminDb
+        .from("users")
+        .select("id")
+        .eq("id", user_id)
+        .eq("partner_id", callerId)
+        .maybeSingle();
+
+      if (!linkCheck) {
+        return errorResponse("Cannot sync another user's streak", 403);
+      }
+    }
+
+    const { data: current, error: readErr } = await adminDb
+      .from("streaks")
+      .select("*")
+      .eq("user_id", user_id)
+      .single();
+
+    if (readErr) return errorResponse(readErr.message, 500);
+    if (!current) return errorResponse("No streak record found", 404);
+
+    const correctedLongest = Math.max(
+      current.current_streak ?? 0,
+      current.longest_streak ?? 0,
+    );
+
+    if (correctedLongest === (current.longest_streak ?? 0)) {
+      return jsonResponse(current);
+    }
+
+    const { data: updated, error: writeErr } = await adminDb
+      .from("streaks")
+      .update({
+        longest_streak: correctedLongest,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user_id)
+      .select("*")
+      .single();
+
+    if (writeErr) return errorResponse(writeErr.message, 500);
+    return jsonResponse(updated);
+  },
+
   // ── billing.createCheckout ──
   "billing.createCheckout": async (payload, callerId) => {
     const { user_id, email, plan } = payload as {

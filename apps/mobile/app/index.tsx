@@ -212,7 +212,7 @@ export default function DashboardScreen() {
       <Card style={styles.streakCard}>
         <StreakCounter
           currentStreak={streak?.current_streak ?? 0}
-          longestStreak={streak?.longest_streak ?? 0}
+          longestStreak={Math.max(streak?.longest_streak ?? 0, streak?.current_streak ?? 0)}
         />
       </Card>
 
