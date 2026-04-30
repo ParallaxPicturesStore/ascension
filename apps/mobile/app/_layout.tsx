@@ -4,6 +4,7 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
+import { useFonts, AfacadFlux_400Regular, AfacadFlux_500Medium, AfacadFlux_600SemiBold, AfacadFlux_700Bold } from '@expo-google-fonts/afacad-flux';
 import { theme } from '@ascension/ui';
 import { createApiClient } from '@ascension/api';
 import type { AscensionAPI, StorageAdapter } from '@ascension/api';
@@ -241,6 +242,20 @@ export default function RootLayout() {
     }),
     [],
   );
+  const [fontsLoaded] = useFonts({
+    'Afacad Flux': AfacadFlux_400Regular,
+    'Afacad Flux Medium': AfacadFlux_500Medium,
+    'Afacad Flux SemiBold': AfacadFlux_600SemiBold,
+    'Afacad Flux Bold': AfacadFlux_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.accent} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>

@@ -57,10 +57,11 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing['3xl'],
   },
   title: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.headingFamily,
     fontSize: theme.fontSize.h1,
     fontWeight: theme.fontWeight.bold,
-    color: theme.colors.foreground,
+    lineHeight: theme.lineHeight.h1,
+    color: theme.colors.textPrimary,
     marginBottom: theme.spacing.lg,
   },
 });
