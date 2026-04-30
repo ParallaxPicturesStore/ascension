@@ -171,14 +171,6 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => router.push('/encourage')}
-          >
-            <Text style={styles.actionIcon}>{'\u{1F4AC}'}</Text>
-            <Text style={styles.actionLabel}>Encourage</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
             onPress={() => router.push('/alerts')}
           >
             <Text style={styles.actionIcon}>{'\u{1F514}'}</Text>

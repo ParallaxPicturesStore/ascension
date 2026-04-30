@@ -96,11 +96,6 @@ export default function StreakScreen() {
         })}
       </View>
 
-      <Button
-        title="Send Encouragement"
-        onPress={() => router.push('/encourage')}
-        style={styles.encourageButton}
-      />
     </ScreenLayout>
   );
 }
