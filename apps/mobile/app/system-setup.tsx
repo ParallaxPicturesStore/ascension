@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Card, Header, ScreenLayout, theme } from '@ascension/ui';
 import LockIcon from '../assets/icons/lock.svg';
+import ProtectedIcon from '../assets/icons/protected.svg';
 import { useOnboarding } from './_layout';
 
 export default function SystemSetupScreen() {
@@ -36,9 +37,7 @@ export default function SystemSetupScreen() {
         <View style={styles.successContainer}>
           <Text style={styles.brand}>ASCENSION</Text>
 
-          <View style={styles.successBadge}>
-            <Text style={styles.successCheck}>✓</Text>
-          </View>
+          <ProtectedIcon width={96} height={96} style={styles.successBadge} />
 
           <Text style={styles.successHeading}>You're protected</Text>
           <Text style={styles.successSubheading}>Monitoring is now active.</Text>
@@ -169,19 +168,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing['3xl'],
   },
   successBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#dce8ff',
     marginBottom: theme.spacing.xl,
-  },
-  successCheck: {
-    fontSize: 48,
-    color: theme.colors.accent,
-    fontWeight: '700',
-    lineHeight: 54,
   },
   successHeading: {
     fontFamily: theme.typography.headingFamily,
