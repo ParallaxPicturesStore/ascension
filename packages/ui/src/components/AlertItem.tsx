@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, type ViewStyle } from 'react-native';
 import { theme } from '../theme';
 import { type AlertType, ALERT_TYPE_ICONS, ALERT_TYPE_LABELS, formatRelativeTime, getAlertSeverity } from '@ascension/shared';
-import { WarningIcon } from '@/assets/icons';
+import { WarningIcon } from '../../../../apps/ally/src/assets/icons';
 
 export interface AlertItemProps {
   type: AlertType | string;
