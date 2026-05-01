@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Alert } from 'react-native';
 import { theme, ScreenLayout, Card, Button, SectionHeader, Avatar, BackButton, Toggle } from '@ascension/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
+import { useApi } from '@/hooks/useApi';
 import { router } from 'expo-router';
 
 interface NotificationPrefs {
@@ -15,18 +16,29 @@ interface NotificationPrefs {
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const { partner } = usePartner(session?.user?.id);
+  const api = useApi();
   const [notifications, setNotifications] = useState<NotificationPrefs>({
-    content_detected: true,
-    evasion: true,
-    attempted_access: true,
-    streak_milestones: true,
+    content_detected: false,
+    evasion: false,
+    attempted_access: false,
+    streak_milestones: false,
   });
 
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    api.users.getProfile(session.user.id).then((profile) => {
+      const saved = profile.notification_settings;
+      if (saved && Object.keys(saved).length > 0) {
+        setNotifications((prev) => ({ ...prev, ...saved }));
+      }
+    }).catch(() => {});
+  }, [session?.user?.id]);
+
   function toggleNotification(key: keyof NotificationPrefs) {
-    setNotifications((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    const updated = { ...notifications, [key]: !notifications[key] };
+    setNotifications(updated);
+    if (!session?.user?.id) return;
+    api.users.updateProfile(session.user.id, { notification_settings: updated }).catch(() => {});
   }
 
   function handleSignOut() {
