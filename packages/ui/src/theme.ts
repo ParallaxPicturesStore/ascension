@@ -34,6 +34,7 @@ export const theme = {
     onAccent: '#FFFFFF',
     onPrimary: '#FFFFFF',
     overlay: 'rgba(15, 23, 42, 0.08)',
+    intro:'#4D4D4D'
   },
   spacing: {
     xs: 4,
@@ -44,6 +45,7 @@ export const theme = {
     xl: 32,
     '2xl': 48,
     '3xl': 64,
+    tp:44
   },
   fontSize: {
     caption: 13,
@@ -70,6 +72,7 @@ export const theme = {
     body: 24,
     bodyLg: 28,
     button: 24,
+    sm:36,
     h3: 26,
     h2: 34,
     h1: 43,

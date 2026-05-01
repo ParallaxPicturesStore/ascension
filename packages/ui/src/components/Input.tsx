@@ -128,13 +128,13 @@ export function Input({ label, error, style, ...textInputProps }: InputProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { marginBottom: theme.spacing.base },
+  container: {  },
   label: {
     fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.bodyLg,
-    fontWeight: theme.fontWeight.semiBold,
+    fontWeight: theme.fontWeight.regular,
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -149,7 +149,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.fontSize.body,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.regular,
     // lineHeight intentionally omitted: causes TextInput lag/jank on Android
     color: theme.colors.textPrimary,
     paddingVertical: Platform.OS === 'android' ? 0 : theme.spacing.md,

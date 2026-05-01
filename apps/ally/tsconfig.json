@@ -1,12 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "jsx": "react-jsx",
-    "lib": ["ES2020"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "strict": true,
     "paths": {
       "@/*": ["./src/*"]
     }

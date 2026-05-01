@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { theme, ScreenLayout, Input, Button, Card } from '@ascension/ui';
+import { theme, ScreenLayout, Input, Button, Card, BackButton } from '@ascension/ui';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
@@ -38,14 +38,23 @@ export default function ConnectScreen() {
   }
 
   return (
-    <ScreenLayout title="Connect with your partner">
-      <Text style={styles.intro}>
+    <ScreenLayout>
+
+      <BackButton onPress={()=>{
+        router.back()
+      }}/>
+      
+        <View style={styles.header}>
+                <Text style={styles.title}>Connect with your partner</Text>
+                <Text style={styles.intro}>
         Your partner has invited you to be their accountability ally. Enter the
         invite code they shared with you to get connected.
       </Text>
+              </View>
+     
 
-      <Card style={styles.card}>
-        <View>
+      <View style={styles.card}>
+        <View style={styles.inviteSection}>
           <Input
             label="Invite Code"
             placeholder="Paste invite code here"
@@ -63,13 +72,13 @@ export default function ConnectScreen() {
             disabled={loading || !inviteCode.trim()}
           />
         </View>
-      </Card>
+      </View>
 
       <View style={styles.infoSection}>
         <Text style={styles.infoTitle}>What you will be able to see</Text>
 
         <View style={styles.infoItem}>
-          <Text style={styles.infoIcon}>{'\u{1F5BC}'}</Text>
+          <Text style={styles.infoIcon}>{'🔒'}</Text>
           <Text style={styles.infoText}>
             Blurred activity screenshots - enough to see patterns, private
             enough to respect boundaries
@@ -77,21 +86,21 @@ export default function ConnectScreen() {
         </View>
 
         <View style={styles.infoItem}>
-          <Text style={styles.infoIcon}>{'\u{1F525}'}</Text>
+          <Text style={styles.infoIcon}>{'📈'}</Text>
           <Text style={styles.infoText}>
             Their current streak and progress over time
           </Text>
         </View>
 
         <View style={styles.infoItem}>
-          <Text style={styles.infoIcon}>{'\u{1F514}'}</Text>
+          <Text style={styles.infoIcon}>{'🔔'}</Text>
           <Text style={styles.infoText}>
             Alerts when something needs your attention
           </Text>
         </View>
 
         <View style={styles.infoItem}>
-          <Text style={styles.infoIcon}>{'\u{1F4AC}'}</Text>
+          <Text style={styles.infoIcon}>{'💬'}</Text>
           <Text style={styles.infoText}>
             Send them words of encouragement when they need it most
           </Text>
@@ -105,12 +114,27 @@ const styles = StyleSheet.create({
   intro: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    color: theme.colors.intro,
     lineHeight: 22,
+    fontWeight:theme.fontWeight.regular,
     marginBottom: theme.spacing.lg,
+  },
+  header:{
+    paddingTop:theme.spacing.base,
+    gap:theme.spacing.xs
+  },
+  title:{
+  fontFamily: theme.typography.headingFamily,
+    fontSize: theme.fontSize.h1,
+    lineHeight: theme.lineHeight.h1,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
   },
   card: {
     marginBottom: theme.spacing.xl,
+  },
+  inviteSection:{
+    gap:theme.spacing.lg
   },
   error: {
     fontFamily: theme.fontFamily,
@@ -119,29 +143,32 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.base,
   },
   infoSection: {
-    marginTop: theme.spacing.base,
+    backgroundColor:'#F8FAFF',
+    marginTop: theme.spacing.md,
+    padding:theme.spacing.base
   },
   infoTitle: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.h3,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.foreground,
-    marginBottom: theme.spacing.base,
+    marginBottom: theme.spacing.sm,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: theme.spacing.base,
+    marginBottom: theme.spacing.sm,
   },
   infoIcon: {
-    fontSize: theme.fontSize.iconMd,
+    fontSize: theme.fontSize.iconSm,
     marginRight: theme.spacing.md,
-    marginTop: theme.spacing.xs / 2,
+    // marginTop: theme.spacing.sm / 2,
   },
   infoText: {
     flex: 1,
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
+    fontWeight:theme.fontWeight.regular,
     color: theme.colors.foreground,
     lineHeight: 22,
   },
