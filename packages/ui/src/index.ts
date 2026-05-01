@@ -12,3 +12,4 @@ export { StreakCounter, type StreakCounterProps } from './components/StreakCount
 export { AlertItem, type AlertItemProps } from './components/AlertItem';
 export { BlurredImage, type BlurredImageProps } from './components/BlurredImage';
 export { Avatar, type AvatarProps } from './components/Avatar';
+export { Toggle, type ToggleProps } from './components/Toggle';

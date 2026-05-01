@@ -34,7 +34,10 @@ export const theme = {
     onAccent: '#FFFFFF',
     onPrimary: '#FFFFFF',
     overlay: 'rgba(15, 23, 42, 0.08)',
-    intro:'#4D4D4D'
+    intro:'#4D4D4D',
+    backgroundCard:'#F0F4FF',
+    white:'#FFFFFF',
+    devider:'#E1E4ED'
   },
   spacing: {
     xs: 4,
@@ -55,6 +58,7 @@ export const theme = {
     h3: 20,
     h2: 28,
     h1: 36,
+    header:24,
     display: 64,
     iconSm: 18,
     iconMd: 20,

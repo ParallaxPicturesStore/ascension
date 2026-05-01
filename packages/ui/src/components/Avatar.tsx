@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   fallback: {
-    backgroundColor: theme.colors.accentLight,
+    backgroundColor: theme.colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
