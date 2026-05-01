@@ -87,6 +87,7 @@ export default function HomeScreen() {
   const [filter, setFilter] = useState<FilterMode>('all');
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [screenshotsLoading, setScreenshotsLoading] = useState(true);
+  const [rulesCount, setRulesCount] = useState(0);
 
   // Fetch screenshots on mount and refresh.
   // Uses getRecentByPartner so we query by the ally's own user ID — no need
@@ -110,6 +111,14 @@ export default function HomeScreen() {
   React.useEffect(() => {
     loadScreenshots();
   }, [loadScreenshots]);
+
+  React.useEffect(() => {
+    if (!session?.user?.id) return;
+    api.users.getProfile(session.user.id).then((profile) => {
+      const settings = profile.notification_settings ?? {};
+      setRulesCount(Object.values(settings).filter(Boolean).length);
+    }).catch(() => {});
+  }, [api, session?.user?.id]);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refresh(), loadScreenshots()]);
@@ -175,7 +184,7 @@ export default function HomeScreen() {
             <CalenderIcon />
             <Text style={styles.actionLabel}>Streak</Text>
             <View style={styles.actionMeta}>
-              <Text style={styles.actionCount}>14</Text>
+              <Text style={styles.actionCount}>{streak?.current_streak ?? 0}</Text>
               <Text style={styles.actionType}>Days</Text>
             </View>
           </TouchableOpacity>
@@ -203,7 +212,7 @@ export default function HomeScreen() {
             {/* <Text style={styles.actionIcon}>{'\u{2699}\u{FE0F}'}</Text> */}
             <Text style={styles.actionLabel}>Settings</Text>
             <View style={styles.actionMeta}>
-              <Text style={styles.actionCount}>3</Text>
+              <Text style={styles.actionCount}>{rulesCount}</Text>
               <Text style={styles.actionType}>rules</Text>
             </View>
           </TouchableOpacity>

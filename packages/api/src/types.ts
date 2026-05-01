@@ -19,6 +19,10 @@ export interface Session {
 
 // ── Users ─────────────────────────────────────────────────────
 
+export interface NotificationSettings {
+  [key: string]: boolean;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -32,6 +36,7 @@ export interface UserProfile {
   partner_password_hash: string | null;
   app_disabled: boolean | null;
   lapse_reminders_sent: string[] | null;
+  notification_settings: NotificationSettings | null;
   created_at: string;
 }
 
