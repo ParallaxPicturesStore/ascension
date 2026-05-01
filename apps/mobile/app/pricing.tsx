@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Linking, Alert } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Linking, Alert, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ScreenLayout, Card, Button, Badge, theme } from '@ascension/ui';
+import { Ionicons } from '@expo/vector-icons';
+import { ScreenLayout, Card, Button, Header, theme } from '@ascension/ui';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 
@@ -12,34 +13,44 @@ interface PlanDetails {
   name: string;
   price: string;
   perMonth: string;
+  periodLabel: string;
   badge?: string;
+  features: string[];
 }
 
 const PLANS: Record<PlanType, PlanDetails> = {
   monthly: {
     id: 'monthly',
     name: 'Monthly',
-    price: '$14.99/mo',
-    perMonth: '$14.99',
+    price: '£14.99/mo',
+    perMonth: '£14.99',
+    periodLabel: 'month',
+    features: [
+      'Real-time screen monitoring',
+      'AI-powered content detection',
+      'Instant partner alerts',
+      'Streak tracking and milestones',
+      'Blocked site protection',
+    ],
   },
   annual: {
     id: 'annual',
     name: 'Annual',
-    price: '$119.88/yr',
-    perMonth: '$9.99',
+    price: '£119.88/yr',
+    perMonth: '£119.88',
+    periodLabel: 'year',
     badge: 'Save 33%',
+    features: [
+      'Everything in monthly',
+      'Priority support',
+      'Advanced analytics',
+      'Custom blocklist',
+      'Early access to new features',
+    ],
   },
 };
 
-const FEATURES = [
-  'Real-time screen monitoring',
-  'AI-powered content detection',
-  'Accountability partner alerts',
-  'Streak tracking and milestones',
-  'Blocked site protection',
-  'Partner encouragement messages',
-  'Priority support',
-];
+const COLLAPSED_FEATURE_COUNT = 3;
 
 export default function PricingScreen() {
   const router = useRouter();
@@ -47,7 +58,15 @@ export default function PricingScreen() {
   const { user } = useAuth();
 
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('annual');
+  const [expandedPlans, setExpandedPlans] = useState<Record<PlanType, boolean>>({
+    monthly: false,
+    annual: true,
+  });
   const [loading, setLoading] = useState(false);
+
+  const toggleExpanded = (planKey: PlanType) => {
+    setExpandedPlans((prev) => ({ ...prev, [planKey]: !prev[planKey] }));
+  };
 
   const handleSubscribe = async () => {
     if (!user) return;
@@ -77,217 +96,283 @@ export default function PricingScreen() {
   };
 
   return (
-    <ScreenLayout title="Choose Your Plan">
-      <Text style={styles.subtitle}>
-        Start your journey with full access to all Ascension features.
-      </Text>
+    <ScreenLayout style={styles.screenLayout}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Top header: back button + centered title */}
+        <Header
+          title="Pricing"
+          showBack
+          onBack={() => router.back()}
+          style={styles.header}
+        />
 
-      {/* Plan cards */}
-      <View style={styles.planCards}>
-        {(Object.keys(PLANS) as PlanType[]).map((planKey) => {
-          const plan = PLANS[planKey];
-          const isSelected = selectedPlan === planKey;
+        <Text style={styles.heading}>Choose your plan</Text>
+        <Text style={styles.subtitle}>
+          14-day free trial on all plans. Cancel anytime.
+        </Text>
 
-          return (
-            <TouchableOpacity
-              key={planKey}
-              onPress={() => setSelectedPlan(planKey)}
-              activeOpacity={0.7}
-              style={styles.planTouchable}
-            >
-              <Card
-                style={[
-                  styles.planCard,
-                  isSelected && styles.planCardSelected,
-                ]}
+        {/* Plan cards */}
+        <View style={styles.planCards}>
+          {(Object.keys(PLANS) as PlanType[]).map((planKey) => {
+            const plan = PLANS[planKey];
+            const isSelected = selectedPlan === planKey;
+            const isExpanded = expandedPlans[planKey];
+            const planCardStyle = isSelected
+              ? { ...styles.planCard, ...styles.planCardSelected }
+              : styles.planCard;
+            const visibleFeatures = isExpanded
+              ? plan.features
+              : plan.features.slice(0, COLLAPSED_FEATURE_COUNT);
+            const canToggle = plan.features.length > COLLAPSED_FEATURE_COUNT;
+
+            return (
+              <TouchableOpacity
+                key={planKey}
+                onPress={() => setSelectedPlan(planKey)}
+                activeOpacity={0.85}
+                style={styles.planTouchable}
               >
-                <View style={styles.planHeader}>
-                  <Text style={[styles.planName, isSelected && styles.planNameSelected]}>
-                    {plan.name}
-                  </Text>
-                  {plan.badge && (
-                    <Badge text={plan.badge} variant="success" />
-                  )}
-                </View>
-
-                <Text style={[styles.planPrice, isSelected && styles.planPriceSelected]}>
-                  {plan.perMonth}
-                </Text>
-                <Text style={styles.planPriceLabel}>per month</Text>
-
-                {planKey === 'annual' && (
-                  <Text style={styles.planBilled}>Billed annually at {plan.price}</Text>
-                )}
-
-                {/* Selection indicator */}
-                <View style={styles.radioRow}>
-                  <View
-                    style={[
-                      styles.radio,
-                      isSelected && styles.radioSelected,
-                    ]}
-                  >
-                    {isSelected && <View style={styles.radioInner} />}
+                <Card style={planCardStyle}>
+                  {/* Header row: name + badge + radio */}
+                  <View style={styles.planHeader}>
+                    <Text style={styles.planName}>{plan.name}</Text>
+                    <View style={styles.planHeaderRight}>
+                      {plan.badge && (
+                        <View style={styles.savingsBadge}>
+                          <Text style={styles.savingsBadgeText}>{plan.badge}</Text>
+                        </View>
+                      )}
+                      <View
+                        style={[
+                          styles.radio,
+                          isSelected && styles.radioSelected,
+                        ]}
+                      >
+                        {isSelected && (
+                          <Ionicons
+                            name="checkmark"
+                            size={14}
+                            color={theme.colors.onAccent}
+                          />
+                        )}
+                      </View>
+                    </View>
                   </View>
-                  <Text style={styles.radioLabel}>
-                    {isSelected ? 'Selected' : 'Select'}
-                  </Text>
-                </View>
-              </Card>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
 
-      {/* Features */}
-      <View style={styles.featuresSection}>
-        <Text style={styles.featuresTitle}>Everything included:</Text>
-        {FEATURES.map((feature, index) => (
-          <View key={index} style={styles.featureRow}>
-            <Text style={styles.featureCheck}>✓</Text>
-            <Text style={styles.featureText}>{feature}</Text>
-          </View>
-        ))}
-      </View>
+                  {/* Price row */}
+                  <View style={styles.priceRow}>
+                    <Text style={styles.planPrice}>{plan.perMonth}</Text>
+                    <Text style={styles.planPeriod}> {plan.periodLabel}</Text>
+                  </View>
 
-      {/* Subscribe button */}
-      <Button
-        title={loading ? 'Loading...' : `Subscribe - ${PLANS[selectedPlan].price}`}
-        onPress={handleSubscribe}
-        disabled={loading}
-        style={styles.subscribeButton}
-      />
+                  {/* Features */}
+                  <View style={styles.featuresList}>
+                    {visibleFeatures.map((feature, index) => (
+                      <View key={index} style={styles.featureRow}>
+                        <Ionicons
+                          name="checkmark"
+                          size={18}
+                          color={theme.colors.success}
+                          style={styles.featureCheck}
+                        />
+                        <Text style={styles.featureText}>{feature}</Text>
+                      </View>
+                    ))}
+                  </View>
 
-      <Button
-        title="Back"
-        variant="ghost"
-        onPress={() => router.back()}
-        style={styles.backButton}
-      />
+                  {/* See more / less */}
+                  {canToggle && (
+                    <TouchableOpacity
+                      onPress={() => toggleExpanded(planKey)}
+                      style={styles.seeMoreRow}
+                      activeOpacity={0.6}
+                    >
+                      <Text style={styles.seeMoreText}>
+                        {isExpanded ? 'See less' : 'See more'}
+                      </Text>
+                      <Ionicons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={theme.colors.accent}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </Card>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Subscribe button */}
+        <Button
+          title={loading ? 'Loading...' : 'Start free trial'}
+          onPress={handleSubscribe}
+          disabled={loading}
+          style={styles.subscribeButton}
+        />
+
+        <Text style={styles.footerText}>
+          Payments processed securely via Stripe. Cancel anytime from your account settings.
+        </Text>
+      </ScrollView>
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  screenLayout: {
+    paddingHorizontal: 24,
+    paddingTop: theme.spacing.base,
+  },
+  header: {
+    marginBottom: theme.spacing.xl,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xl,
+  },
+  heading: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.h1,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.xs,
+    lineHeight: theme.lineHeight.h1,
+  },
   subtitle: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
-    lineHeight: 22,
-    marginBottom: theme.spacing.lg,
+    color: theme.colors.textSecondary,
+    lineHeight: theme.lineHeight.body,
+    marginBottom: 26,
   },
   planCards: {
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
+    gap: 20,
+    marginBottom: 28,
   },
   planTouchable: {
-    flex: 1,
+    borderRadius: 30,
   },
   planCard: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: theme.colors.cardBorder,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 30,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   planCardSelected: {
     borderColor: theme.colors.accent,
     backgroundColor: theme.colors.accentLight,
+    borderWidth: 1.4,
   },
   planHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
+  },
+  planHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  savingsBadge: {
+    backgroundColor: '#AEC3FF',
+    paddingHorizontal: theme.spacing.base,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.pill,
+    marginRight: theme.spacing.md,
+  },
+  savingsBadgeText: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.caption,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.accent,
   },
   planName: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.bodyLg,
+    fontSize: theme.fontSize.h3,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.foreground,
-  },
-  planNameSelected: {
-    color: theme.colors.accent,
-  },
-  planPrice: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.h1,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.foreground,
-  },
-  planPriceSelected: {
-    color: theme.colors.accent,
-  },
-  planPriceLabel: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.sm,
-  },
-  planBilled: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.sm,
-  },
-  radioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
   },
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: theme.colors.cardBorder,
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.sm,
+    backgroundColor: 'transparent',
   },
   radioSelected: {
     borderColor: theme.colors.accent,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     backgroundColor: theme.colors.accent,
   },
-  radioLabel: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    color: theme.colors.muted,
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: theme.spacing.sm,
   },
-  featuresSection: {
-    marginBottom: theme.spacing.xl,
-  },
-  featuresTitle: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.bodyLg,
+  planPrice: {
+    fontFamily: 'Phosphate',
+    fontSize: theme.fontSize.h1,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.foreground,
-    marginBottom: theme.spacing.base,
+    letterSpacing: -0.3,
+  },
+  planPeriod: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.foreground,
+    marginLeft: theme.spacing.xs,
+  },
+  featuresList: {
+    marginTop: theme.spacing.xs,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    // marginBottom: theme.spacing.xs,
   },
   featureCheck: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.body,
-    color: theme.colors.success,
-    fontWeight: theme.fontWeight.bold,
-    marginRight: theme.spacing.md,
+    marginRight: theme.spacing.sm,
   },
   featureText: {
+    flex: 1,
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.foreground,
-    lineHeight: 22,
+    color: theme.colors.textSecondary,
+    lineHeight: theme.lineHeight.body,
+  },
+  seeMoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.xs,
+    paddingTop: theme.spacing.xs,
+  },
+  seeMoreText: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.primary,
+    marginRight: theme.spacing.xs,
   },
   subscribeButton: {
-    marginBottom: theme.spacing.md,
+    marginBottom: 14,
+    minHeight: 64,
+    borderRadius: theme.borderRadius.button,
   },
-  backButton: {
-    marginBottom: theme.spacing.lg,
+  footerText: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 28,
+    paddingHorizontal: 8,
+    marginBottom: theme.spacing.sm,
   },
 });
