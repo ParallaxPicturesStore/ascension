@@ -17,12 +17,14 @@ import {
   Avatar,
   SectionHeader,
   BlurredImage,
+  ScreenLayout,
 } from '@ascension/ui';
 import { formatRelativeTime } from '@ascension/shared';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
 import { useApi } from '../src/hooks/useApi';
 import type { Screenshot } from '@ascension/api';
+import { AlertIcon, CalenderIcon, NoActivity, SettingsIcon } from '@/assets/icons';
 
 // Fetches a short-lived signed URL for a private-bucket screenshot and
 // renders it. Falls back to a placeholder if the path is missing or the
@@ -96,7 +98,7 @@ export default function HomeScreen() {
     try {
       const recent = await api.screenshots.getRecentByPartner(session.user.id, 500);
       console.log(recent);
-      
+
       setScreenshots(recent);
     } catch {
       // Silently handle - partner data may still be available
@@ -146,16 +148,20 @@ export default function HomeScreen() {
       <View>
         {/* Partner header */}
         <View style={styles.partnerHeader}>
-          <Avatar name={partnerName} size={48} />
+          <Avatar name={partnerName} size={48} style={{ backgroundColor: theme.colors.primary }} textColor={theme.colors.white} />
           <View style={styles.partnerInfo}>
             <Text style={styles.greeting}>
-              How {partnerName} is doing
+              {partnerName}’s activity and progress will appear here
             </Text>
-            {streak && (
+            <Text style={styles.partnerDescription}>
+              Track activity and progress as
+              monitoring begins and over time.
+            </Text>
+            {/* {streak && (
               <Text style={styles.streakPreview}>
                 {streak.current_streak} day streak
               </Text>
-            )}
+            )} */}
           </View>
         </View>
 
@@ -165,32 +171,85 @@ export default function HomeScreen() {
             style={styles.actionButton}
             onPress={() => router.push('/streak')}
           >
-            <Text style={styles.actionIcon}>{'\u{1F525}'}</Text>
+            {/* <Text style={styles.actionIcon}>{'\u{1F525}'}</Text> */}
+            <CalenderIcon />
             <Text style={styles.actionLabel}>Streak</Text>
+            <View style={styles.actionMeta}>
+              <Text style={styles.actionCount}>14</Text>
+              <Text style={styles.actionType}>Days</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push('/alerts')}
           >
-            <Text style={styles.actionIcon}>{'\u{1F514}'}</Text>
+            <AlertIcon />
+            {/* <Text style={styles.actionIcon}>{'\u{1F514}'}</Text> */}
             <Text style={styles.actionLabel}>
-              Alerts{unreadAlertCount > 0 ? ` (${unreadAlertCount})` : ''}
+              Alerts
             </Text>
+            <View style={styles.actionMeta}>
+              <Text style={styles.actionCount}>{unreadAlertCount > 0 ? `${unreadAlertCount}` : ''}</Text>
+              <Text style={styles.actionType}>active</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push('/settings')}
           >
-            <Text style={styles.actionIcon}>{'\u{2699}\u{FE0F}'}</Text>
+            <SettingsIcon />
+            {/* <Text style={styles.actionIcon}>{'\u{2699}\u{FE0F}'}</Text> */}
             <Text style={styles.actionLabel}>Settings</Text>
+            <View style={styles.actionMeta}>
+              <Text style={styles.actionCount}>3</Text>
+              <Text style={styles.actionType}>rules</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* Filter tabs */}
+
+      </View>
+    );
+  }
+
+
+  function renderEmpty() {
+    if (screenshotsLoading) return null;
+    return (
+      <View style={styles.emptyState}>
+        <NoActivity />
+        <Text style={styles.emptyTitle}>
+          {filter === 'flagged'
+            ? 'No flagged activity'
+            : 'No activity yet'}
+        </Text>
+        <Text style={styles.emptyMessage}>
+          {filter === 'flagged'
+            ? `Great news - ${partnerName} has no flagged activity. That is something to celebrate.`
+            : `${partnerName} has not started monitoring yet. Once they do, you will see their activity here.`}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScreenLayout style={styles.container} refreshControl={
+      <RefreshControl
+        refreshing={loading}
+        onRefresh={handleRefresh}
+        tintColor={theme.colors.accent}
+      />
+    }>
+      {renderHeader()}
+      <View style={styles.activityContainer}>
+
         <View style={styles.filterRow}>
-          <SectionHeader title="Activity Feed" />
+          <Text style={styles.cardHeader} >
+            Activity Feed
+          </Text>
           <View style={styles.filters}>
             <TouchableOpacity
               onPress={() => setFilter('all')}
@@ -226,48 +285,19 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
-    );
-  }
+        <FlatList
+          data={filteredScreenshots??[]}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          renderItem={renderScreenshotItem}
+          // ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={styles.listContent}
 
-  function renderEmpty() {
-    if (screenshotsLoading) return null;
-    return (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>{'\u{2728}'}</Text>
-        <Text style={styles.emptyTitle}>
-          {filter === 'flagged'
-            ? 'No flagged activity'
-            : 'No activity yet'}
-        </Text>
-        <Text style={styles.emptyMessage}>
-          {filter === 'flagged'
-            ? `Great news - ${partnerName} has no flagged activity. That is something to celebrate.`
-            : `${partnerName} has not started monitoring yet. Once they do, you will see their activity here.`}
-        </Text>
+          showsVerticalScrollIndicator={false}
+        />
       </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <FlatList
-        data={filteredScreenshots}
-        keyExtractor={(item) => item.id}
-        renderItem={renderScreenshotItem}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.accent}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+    </ScreenLayout>
   );
 }
 
@@ -277,24 +307,34 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   listContent: {
-    paddingHorizontal: theme.spacing.base,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing['3xl'],
+    // paddingHorizontal: theme.spacing.base,
+    // paddingTop: theme.spacing.lg,
+    // paddingBottom: theme.spacing['3xl'],
   },
   partnerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    // alignItems: 'center',
     marginBottom: theme.spacing.lg,
   },
   partnerInfo: {
-    marginLeft: theme.spacing.md,
+    // marginLeft: theme.spacing.md,
     flex: 1,
   },
   greeting: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.h2,
-    fontWeight: theme.fontWeight.bold,
+    fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
+    lineHeight: theme.lineHeight.h2,
+    marginTop: theme.spacing.xs
+
+  },
+  partnerDescription: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.intro,
+    width:'70%'
   },
   streakPreview: {
     fontFamily: theme.fontFamily,
@@ -312,9 +352,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: theme.spacing.md,
     marginHorizontal: theme.spacing.xs,
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.settings,
     borderRadius: theme.borderRadius.card,
-    borderWidth: 1,
+    // borderWidth: 1,
     borderColor: theme.colors.cardBorder,
   },
   actionIcon: {
@@ -323,33 +363,69 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    fontWeight: theme.fontWeight.medium,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.regular,
     color: theme.colors.foreground,
+  },
+  actionMeta: {
+    alignItems: 'center'
+  },
+  actionCount: {
+    fontFamily: theme.typography.phosphateSolid,
+    fontSize: theme.fontSize.cardText,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.foreground,
+  },
+  actionType: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.foreground,
+  },
+  activityContainer: {
+    backgroundColor: theme.colors.settings,
+    padding: theme.spacing.base,
+    gap: theme.spacing.base,
+    borderRadius: theme.borderRadius.card
+
+
+  },
+  cardHeader: {
+    fontSize: theme.fontSize.header,
+    fontWeight: theme.fontWeight.medium,
+    fontFamily: theme.fontFamily
   },
   filterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+
+    // marginBottom: theme.spacing.sm,
   },
   filters: {
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.pill,
+      borderWidth:1,
+    borderColor:theme.colors.borderColor,
+  
   },
   filterTab: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.pill,
     marginLeft: theme.spacing.xs,
+
   },
   filterTabActive: {
     backgroundColor: theme.colors.accent,
   },
   filterText: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.muted,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.baseColor,
   },
   filterTextActive: {
     color: theme.colors.onAccent,
@@ -394,17 +470,19 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.h3,
-    fontWeight: theme.fontWeight.bold,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
     marginBottom: theme.spacing.sm,
+    marginTop: theme.spacing.md
   },
   emptyMessage: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    color: theme.colors.message,
     textAlign: 'center',
     lineHeight: 22,
     paddingHorizontal: theme.spacing.lg,
+
   },
 });

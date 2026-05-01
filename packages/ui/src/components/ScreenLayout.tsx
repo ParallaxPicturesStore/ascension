@@ -42,7 +42,7 @@ export function ScreenLayout({ title, children, scrollable = true, style, refres
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.white,
   },
   scrollContainer: {
     flex: 1,

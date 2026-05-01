@@ -7,6 +7,7 @@ export interface AvatarProps {
   source?: ImageSourcePropType;
   size?: number;
   style?: ViewStyle;
+  textColor?: string;
 }
 
 function getInitials(name: string | null | undefined): string {
@@ -16,7 +17,7 @@ function getInitials(name: string | null | undefined): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function Avatar({ name, source, size = 40, style }: AvatarProps) {
+export function Avatar({ name, source, size = 40, style ,textColor}: AvatarProps) {
   const containerSize = {
     width: size,
     height: size,
@@ -41,7 +42,7 @@ export function Avatar({ name, source, size = 40, style }: AvatarProps) {
       accessibilityRole="image"
       accessibilityLabel={a11yLabel}
     >
-      <Text style={[styles.initials, { fontSize: size * 0.4 }]}>
+      <Text style={[styles.initials, { fontSize: size * 0.4 , color: textColor ?? theme.colors.accent}]}>
         {getInitials(name)}
       </Text>
     </View>

@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, type ViewStyle } from 'react-native';
 import { theme } from '../theme';
 import { type AlertType, ALERT_TYPE_ICONS, ALERT_TYPE_LABELS, formatRelativeTime, getAlertSeverity } from '@ascension/shared';
+import { WarningIcon } from '@/assets/icons';
 
 export interface AlertItemProps {
   type: AlertType | string;
@@ -24,10 +25,11 @@ export const AlertItem = React.memo(function AlertItem({ type, message, timestam
 
   return (
     <View style={[styles.container, !read && styles.unread, style]}>
-      <Text style={styles.icon}>{icon}</Text>
+      {/* <Text style={styles.icon}>{icon}</Text> */}
+      <WarningIcon/>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={[styles.type, { color: SEVERITY_COLORS[severity] }]}>{label}</Text>
+          <Text style={[styles.type]}>{label}</Text>
           <Text style={styles.time}>{formatRelativeTime(timestamp)}</Text>
         </View>
         <Text style={styles.message} numberOfLines={2}>{message}</Text>
@@ -40,13 +42,16 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     padding: theme.spacing.base,
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.backgroundCard,
     borderRadius: theme.borderRadius.card,
-    borderWidth: 1,
+    // borderWidth: 1,
     borderColor: theme.colors.cardBorder,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    gap:theme.spacing.md,
+    opacity:0.8
   },
   unread: {
+    opacity:1,
     backgroundColor: theme.colors.accentLight,
   },
   icon: {
@@ -65,18 +70,19 @@ const styles = StyleSheet.create({
   },
   type: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    fontWeight: theme.fontWeight.bold,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.medium,
   },
   time: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    color: theme.colors.muted,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.intro,
   },
   message: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.foreground,
+    color: theme.colors.intro,
+    fontWeight:theme.fontWeight.regular,
     lineHeight: 20,
   },
 });

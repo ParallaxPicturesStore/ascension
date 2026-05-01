@@ -90,6 +90,7 @@ export default function RootLayout() {
     'Afacad Flux Medium': AfacadFlux_500Medium,
     'Afacad Flux SemiBold': AfacadFlux_600SemiBold,
     'Afacad Flux Bold': AfacadFlux_700Bold,
+    'Phosphate-Solid': require('../assets/fonts/Phosphate-Solid.ttf'),
   });
 
   if (!fontsLoaded) {
