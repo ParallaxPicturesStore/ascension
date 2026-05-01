@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, Alert, ActivityIndicator, Linking } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, View, Text, Alert, ActivityIndicator, Linking, Pressable, TextInput, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ScreenLayout,
   Card,
   Button,
+  BackButton,
   Input,
   SectionHeader,
-  Badge,
   theme,
 } from '@ascension/ui';
-import type { UserProfile, SubscriptionStatus } from '../src/hooks/useApi';
+import type { UserProfile, SubscriptionStatus } from '@ascension/api';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 
@@ -39,6 +41,15 @@ export default function SettingsScreen() {
   const [savingPartner, setSavingPartner] = useState(false);
 
   const [managingSubscription, setManagingSubscription] = useState(false);
+
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const navWidth = Math.min(360, Math.max(304, width - 32));
+  const navBottomOffset = Math.max(insets.bottom + 12, 28);
+
+  const showUnavailableTab = useCallback((label: string) => {
+    Alert.alert('Coming Soon', `${label} is not available in the mobile app yet.`);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -145,159 +156,252 @@ export default function SettingsScreen() {
 
   if (loading) {
     return (
-      <ScreenLayout title="Settings" scrollable={false}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.accent} />
-        </View>
-      </ScreenLayout>
+      <View style={styles.screenRoot}>
+        <ScreenLayout scrollable={false}>
+          <View style={styles.pageHeader}>
+            <BackButton onPress={() => router.back()} />
+          </View>
+          <Text style={styles.pageTitle}>Settings</Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.accent} />
+          </View>
+        </ScreenLayout>
+      </View>
     );
   }
 
   const badge = STATUS_BADGE_MAP[subscriptionStatus] ?? STATUS_BADGE_MAP.trial;
+  const screenContentStyle = {
+    paddingBottom: 120 + insets.bottom,
+  };
 
   return (
-    <ScreenLayout title="Settings">
-      {/* Profile */}
-      <SectionHeader title="Profile" />
-      <Card style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Email</Text>
-          <Text style={styles.value}>{profile?.email ?? ''}</Text>
+    <View style={styles.screenRoot}>
+    <ScreenLayout style={screenContentStyle}>
+      {/* Page header */}
+      <View style={styles.pageHeader}>
+        <BackButton onPress={() => router.back()} />
+      </View>
+      <Text style={styles.pageTitle}>Settings</Text>
+
+      {/* Sections — gap: 28 column layout matching Figma */}
+      <View style={styles.sections}>
+
+        {/* Profile */}
+        <View>
+          <SectionHeader title="Profile" />
+          <Card>
+            <View style={styles.row}>
+              <Text style={styles.label}>Email</Text>
+              <Text style={styles.value}>{profile?.email ?? ''}</Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            {editingName ? (
+              <View>
+                <Input
+                  label="Name"
+                  value={nameValue}
+                  onChangeText={setNameValue}
+                  autoCapitalize="words"
+                />
+                <View style={styles.editActions}>
+                  <Button
+                    title="Cancel"
+                    variant="ghost"
+                    onPress={() => {
+                      setEditingName(false);
+                      setNameValue(profile?.name ?? '');
+                    }}
+                  />
+                  <Button
+                    title={savingName ? 'Saving...' : 'Save'}
+                    onPress={handleSaveName}
+                    disabled={savingName}
+                  />
+                </View>
+              </View>
+            ) : (
+              <View style={styles.row}>
+                <Text style={styles.label}>Name</Text>
+                <View style={styles.editRow}>
+                  <Text style={styles.value}>{profile?.name ?? 'Not set'}</Text>
+                  <Button
+                    title="Edit"
+                    variant="ghost"
+                    onPress={() => setEditingName(true)}
+                    style={styles.editButton}
+                  />
+                </View>
+              </View>
+            )}
+          </Card>
         </View>
 
-        <View style={styles.divider} />
-
-        {editingName ? (
-          <View>
-            <Input
-              label="Name"
-              value={nameValue}
-              onChangeText={setNameValue}
-              autoCapitalize="words"
+        {/* Partner */}
+        <View style={styles.partnerSection}>
+          <SectionHeader title="Accountability Partner" />
+          <View style={styles.partnerInputContainer}>
+            <Text style={styles.partnerInputLabel}>Partner email</Text>
+            <TextInput
+              value={partnerEmail}
+              onChangeText={setPartnerEmail}
+              placeholder="partner@email.com"
+              placeholderTextColor={theme.colors.muted}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+              style={styles.partnerInputField}
             />
-            <View style={styles.editActions}>
-              <Button
-                title="Cancel"
-                variant="ghost"
-                onPress={() => {
-                  setEditingName(false);
-                  setNameValue(profile?.name ?? '');
-                }}
-              />
-              <Button
-                title={savingName ? 'Saving...' : 'Save'}
-                onPress={handleSaveName}
-                disabled={savingName}
-              />
-            </View>
           </View>
-        ) : (
-          <View style={styles.row}>
-            <Text style={styles.label}>Name</Text>
-            <View style={styles.editRow}>
-              <Text style={styles.value}>{profile?.name ?? 'Not set'}</Text>
-              <Button
-                title="Edit"
-                variant="ghost"
-                onPress={() => setEditingName(true)}
-                style={styles.editButton}
-              />
-            </View>
-          </View>
-        )}
-      </Card>
-
-      {/* Partner */}
-      <SectionHeader
-        title="Accountability Partner"
-        style={styles.sectionSpacer}
-      />
-      <Card style={styles.card}>
-        <Input
-          label="Partner Email"
-          placeholder="partner@email.com"
-          value={partnerEmail}
-          onChangeText={setPartnerEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <Button
-          title={savingPartner ? 'Updating...' : 'Update Partner'}
-          variant="secondary"
-          onPress={handleUpdatePartner}
-          disabled={savingPartner}
-        />
-      </Card>
-
-      {/* Subscription */}
-      <SectionHeader title="Subscription" style={styles.sectionSpacer} />
-      <Card style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Status</Text>
-          <Badge text={badge.text} variant={badge.variant} />
+          <Button
+            title={savingPartner ? 'Updating...' : 'Update partner'}
+            variant="ghost"
+            onPress={handleUpdatePartner}
+            disabled={savingPartner}
+            style={styles.partnerButton}
+          />
         </View>
 
-        {subscriptionStatus === 'trial' && (
-          <Button
-            title="View Plans"
-            variant="primary"
-            onPress={() => router.push('/pricing')}
-            style={styles.planButton}
-          />
-        )}
+        {/* Subscription */}
+        <View style={styles.subscriptionSection}>
+          <SectionHeader title="Subscription" />
+          <View style={styles.subscriptionStatusContainer}>
+            <Text style={styles.subscriptionStatusLabel}>Status</Text>
+            <View style={styles.subscriptionStatusValueWrap}>
+              <View style={styles.subscriptionStatusDot} />
+              <Text style={styles.subscriptionStatusValue}>{badge.text}</Text>
+            </View>
+          </View>
 
-        {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled' || subscriptionStatus === 'expired') && (
-          <Button
-            title={managingSubscription ? 'Opening...' : 'Manage Subscription'}
-            variant="secondary"
-            onPress={handleManageSubscription}
-            disabled={managingSubscription}
-            style={styles.planButton}
-          />
-        )}
-      </Card>
+          {subscriptionStatus === 'trial' && (
+            <Button
+              title="View Plans"
+              variant="primary"
+              onPress={() => router.push('/pricing')}
+              style={styles.planButton}
+            />
+          )}
 
-      {/* Notifications */}
-      <SectionHeader title="Notifications" style={styles.sectionSpacer} />
-      <Card style={styles.card}>
-        <Text style={styles.notifDescription}>
-          Push notifications are used to alert you about streak milestones,
-          partner encouragements, and account updates.
-        </Text>
-      </Card>
-
-      {/* About */}
-      <SectionHeader title="About" style={styles.sectionSpacer} />
-      <Card style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Version</Text>
-          <Text style={styles.value}>0.1.0</Text>
+          {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled' || subscriptionStatus === 'expired') && (
+            <Button
+              title={managingSubscription ? 'Opening...' : 'Manage Subscription'}
+              variant="secondary"
+              onPress={handleManageSubscription}
+              disabled={managingSubscription}
+              style={styles.planButton}
+            />
+          )}
         </View>
-      </Card>
 
-      {/* Sign out */}
-      <View style={styles.signOutSection}>
+        {/* Notifications */}
+        <View>
+          <SectionHeader title="Notifications" />
+          <Card>
+            <Text style={styles.notifDescription}>
+              Push notifications are used to alert you about streak milestones,
+              partner encouragements, and account updates.
+            </Text>
+          </Card>
+        </View>
+
+        {/* About */}
+        <View>
+          <SectionHeader title="About" />
+          <Card>
+            <View style={styles.row}>
+              <Text style={styles.label}>Version</Text>
+              <Text style={styles.value}>0.1.0</Text>
+            </View>
+          </Card>
+        </View>
+
+        {/* Sign out */}
         <Button
           title="Sign Out"
           variant="danger"
           onPress={handleSignOut}
         />
+
       </View>
     </ScreenLayout>
+
+      <View
+        style={[
+          styles.bottomNav,
+          {
+            width: navWidth,
+            marginLeft: -navWidth / 2,
+            bottom: navBottomOffset,
+          },
+        ]}
+      >
+        <Pressable
+          onPress={() => router.push('/')}
+          style={styles.navItem}
+          accessibilityRole="button"
+          accessibilityLabel="Go to dashboard"
+        >
+          <Ionicons name="home-outline" size={23} color="#11131A" />
+        </Pressable>
+
+        <Pressable
+          onPress={() => showUnavailableTab('Connect')}
+          style={styles.navItem}
+          accessibilityRole="button"
+          accessibilityLabel="Connect tab coming soon"
+        >
+          <Ionicons name="search-outline" size={27} color="#11131A" />
+        </Pressable>
+
+        <Pressable
+          onPress={() => showUnavailableTab('Alerts')}
+          style={styles.navItem}
+          accessibilityRole="button"
+          accessibilityLabel="Alerts tab coming soon"
+        >
+          <Ionicons name="notifications-outline" size={25} color="#11131A" />
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/settings')}
+          style={[styles.navItem, styles.navItemActive]}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+        >
+          <Ionicons name="settings-outline" size={25} color="#FFFFFF" />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  pageHeader: {
+    marginBottom: theme.spacing.base,
+  },
+  pageTitle: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.fontSize.h1,
+    fontWeight: theme.fontWeight.semiBold,
+    lineHeight: theme.lineHeight.h1,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.lg,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  card: {
-    marginBottom: theme.spacing.sm,
-  },
-  sectionSpacer: {
-    marginTop: theme.spacing.lg,
+  sections: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 28,
   },
   row: {
     flexDirection: 'row',
@@ -334,9 +438,87 @@ const styles = StyleSheet.create({
   editButton: {
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
+    fontWeight: theme.fontWeight.medium,
+    fontSize: theme.fontSize.h2,
+    borderWidth : 0,
+  },
+  partnerSection: {
+    gap: theme.spacing.md,
+    borderWidth: 0,
+  },
+  partnerInputContainer: {
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#D0D7E5',
+    borderRadius: 28,
+    paddingHorizontal: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.background,
+  },
+  partnerInputLabel: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.muted,
+    marginRight: theme.spacing.base,
+  },
+  partnerInputField: {
+    flex: 1,
+    textAlign: 'right',
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
+    paddingVertical: 0,
+  },
+  partnerButton: {
+    minHeight: 48,
+    width: '100%',
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#223D8C',
+    borderRadius: 132,
+  },
+  subscriptionSection: {
+    gap: theme.spacing.md,
+  },
+  subscriptionStatusContainer: {
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#D0D7E5',
+    borderRadius: 28,
+    paddingHorizontal: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.background,
+  },
+  subscriptionStatusLabel: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.muted,
+  },
+  subscriptionStatusValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subscriptionStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#5B5B5B',
+  },
+  subscriptionStatusValue: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.h3,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
   },
   planButton: {
-    marginTop: theme.spacing.base,
+    marginTop: 2,
   },
   notifDescription: {
     fontFamily: theme.fontFamily,
@@ -345,7 +527,27 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   signOutSection: {
-    marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.xl,
+  },
+  bottomNav: {
+    position: 'absolute',
+    left: '50%',
+    height: 78,
+    backgroundColor: '#DCDDFF',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  navItem: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navItemActive: {
+    backgroundColor: '#2A479E',
   },
 });
