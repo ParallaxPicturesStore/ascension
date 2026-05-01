@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
-import { theme, ScreenLayout, AlertItem, Badge } from '@ascension/ui';
+import { theme, ScreenLayout, AlertItem, Badge, BackButton } from '@ascension/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { usePartner } from '@/hooks/usePartner';
 import { useApi } from '../src/hooks/useApi';
 import type { Alert as AlertData } from '@ascension/api';
+import { router } from 'expo-router';
 
 export default function AlertsScreen() {
   const api = useApi();
@@ -58,39 +59,34 @@ export default function AlertsScreen() {
     );
   }
 
-  function renderHeader() {
-    return (
+
+  return (
+    <ScreenLayout style={styles.container} refreshControl={
+      <RefreshControl
+        refreshing={loading}
+        onRefresh={refresh}
+        tintColor={theme.colors.accent}
+      />
+    }>
+      <BackButton onPress={() => router.back()} />
+
       <View style={styles.header}>
         <Text style={styles.title}>Alerts</Text>
         {unreadCount > 0 && (
-          <Badge
-            text={`${unreadCount} unread`}
-            variant="warning"
-          />
+        <Text style={styles.unreadCount}>{unreadCount} unread</Text>
         )}
       </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
       <FlatList
         data={alerts}
         keyExtractor={(item) => item.id}
         renderItem={renderAlert}
-        ListHeaderComponent={renderHeader}
+
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={refresh}
-            tintColor={theme.colors.accent}
-          />
-        }
+
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </ScreenLayout>
   );
 }
 
@@ -100,20 +96,26 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   listContent: {
-    paddingHorizontal: theme.spacing.base,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing['3xl'],
+    // paddingHorizontal: theme.spacing.base,
+    // paddingTop: theme.spacing.lg,
+    // paddingBottom: theme.spacing['3xl'],
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: theme.spacing.lg,
+    marginTop:theme.spacing.md
+  },
+  unreadCount:{
+fontSize:theme.fontSize.bodyLg,
+fontFamily:theme.fontFamily,
+fontWeight:theme.fontWeight.regular
   },
   title: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.h1,
-    fontWeight: theme.fontWeight.bold,
+    fontSize: theme.fontSize.h2,
+    fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
   },
   emptyState: {

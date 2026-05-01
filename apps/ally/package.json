@@ -12,7 +12,9 @@
     "@ascension/api": "*",
     "@ascension/shared": "*",
     "@ascension/ui": "*",
+    "@expo-google-fonts/afacad-flux": "^0.3.0",
     "expo": "~53.0.0",
+    "expo-font": "~13.3.1",
     "expo-linking": "~7.1.7",
     "expo-notifications": "~0.31.5",
     "expo-router": "~5.1.11",
@@ -21,10 +23,12 @@
     "react": "19.0.0",
     "react-native": "0.79.6",
     "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.11.1"
+    "react-native-screens": "~4.11.1",
+    "react-native-svg": "15.11.2"
   },
   "devDependencies": {
-    "@types/react": "~19.0.10",
+    "@types/react": "~19.2.14",
+    "react-native-svg-transformer": "^1.5.3",
     "typescript": "~5.8.3"
   }
 }

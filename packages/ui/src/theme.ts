@@ -37,6 +37,17 @@ export const theme = {
     onAccent: '#FFFFFF',
     onPrimary: '#FFFFFF',
     overlay: 'rgba(15, 23, 42, 0.08)',
+    intro:'#4D4D4D',
+    backgroundCard:'#F0F4FF',
+    white:'#FFFFFF',
+    devider:'#E1E4ED',
+    settings:'#F8FAFF',
+    baseColor:'#8A8A8A',
+    message:'#000000B2',
+    borderColor:'#F0F2FA',
+    black:'#000000',
+    badgeColor:'#AEC3FF',
+    gapBorder:'#496BCE'
   },
   spacing: {
     xs: 4,
@@ -45,8 +56,10 @@ export const theme = {
     base: 16,
     lg: 24,
     xl: 32,
+    tl:20,
     '2xl': 48,
     '3xl': 64,
+    tp:44
   },
   fontSize: {
     caption: 13,
@@ -56,11 +69,15 @@ export const theme = {
     h3: 20,
     h2: 28,
     h1: 36,
+     largeText:44,
+    header:24,
     display: 64,
     iconSm: 18,
     iconMd: 20,
     iconLg: 22,
     iconXl: 48,
+    cardText:32,
+   
   },
   fontWeight: {
     regular: '400' as const,
@@ -73,6 +90,7 @@ export const theme = {
     body: 24,
     bodyLg: 28,
     button: 24,
+    sm:36,
     h3: 26,
     h2: 34,
     h1: 43,
@@ -127,6 +145,7 @@ export const theme = {
   typography: {
     headingFamily: 'Afacad Flux',
     bodyFamily: 'Afacad Flux',
+    phosphateSolid:'Phosphate-Solid'
   },
   components: {
     input: {
