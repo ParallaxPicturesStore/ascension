@@ -198,7 +198,7 @@ function AuthGate() {
             router.replace('/system-setup');
           } else if (
             !incomplete
-            && (inAuthGroup || inOnboarding || (inSystemSetup && (monitoringSetupDone || monitoringSetupDeferred || expired)))
+            && (inAuthGroup || inOnboarding)
           ) {
             router.replace('/');
           }
@@ -222,7 +222,7 @@ function AuthGate() {
         router.replace('/system-setup');
       } else if (
         !needsOnboarding
-        && (inAuthGroup || inOnboarding || (inSystemSetup && (monitoringSetupDone || monitoringSetupDeferred || subscriptionExpired)))
+        && (inAuthGroup || inOnboarding)
       ) {
         router.replace('/');
       }
