@@ -199,7 +199,7 @@ export default function SettingsScreen() {
             <View style={styles.divider} />
 
             {editingName ? (
-              <View>
+              <View style={styles.nameEditContainer}>
                 <Input
                   label="Name"
                   value={nameValue}
@@ -210,6 +210,7 @@ export default function SettingsScreen() {
                   <Button
                     title="Cancel"
                     variant="ghost"
+                    style={styles.editActionButton}
                     onPress={() => {
                       setEditingName(false);
                       setNameValue(profile?.name ?? '');
@@ -219,6 +220,7 @@ export default function SettingsScreen() {
                     title={savingName ? 'Saving...' : 'Save'}
                     onPress={handleSaveName}
                     disabled={savingName}
+                    style={styles.editActionButton}
                   />
                 </View>
               </View>
@@ -421,7 +423,7 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    color: theme.colors.inputSecondaryText,
   },
   value: {
     fontFamily: theme.fontFamily,
@@ -432,8 +434,17 @@ const styles = StyleSheet.create({
   editActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
+    marginTop: theme.spacing.base,
+  },
+  nameEditContainer: {
+    gap: theme.spacing.xs,
+  },
+  editActionButton: {
+    minWidth: 96,
+    minHeight: 42,
+    borderRadius: 132,
   },
   editButton: {
     paddingVertical: theme.spacing.xs,
@@ -460,7 +471,7 @@ const styles = StyleSheet.create({
   partnerInputLabel: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    color: theme.colors.inputSecondaryText,
     marginRight: theme.spacing.base,
   },
   partnerInputField: {
@@ -523,7 +534,7 @@ const styles = StyleSheet.create({
   notifDescription: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    color: theme.colors.cardText,
     lineHeight: 22,
   },
   signOutSection: {
