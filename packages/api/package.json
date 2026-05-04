@@ -7,6 +7,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@ascension/shared": "*",
     "@supabase/supabase-js": "^2.49.1"
   },
   "peerDependencies": {
