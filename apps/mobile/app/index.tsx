@@ -17,8 +17,7 @@ import { vpnManager } from '../src/native/VPNManager';
 import { stopMonitoring } from '../src/services/MonitoringService';
 import { isSubscriptionExpired } from '../src/utils/subscription';
 import { SubscriptionSuspendedView } from '../src/components/SubscriptionSuspendedView';
-import AlertIcon from '../assets/icons/alert.svg';
-import AlertBoxIcon from '../assets/icons/alert_box.svg';
+import SubscriptionAlertIcon from '../assets/icons/subscription_alert.svg';
 import BlockedSiteThisWeekIcon from '../assets/icons/blocked_site_this_week.svg';
 import BlockedSiteIcon from '../assets/icons/blocked_site.svg';
 import FlaggedIcon from '../assets/icons/flagged.svg';
@@ -283,7 +282,7 @@ export default function DashboardScreen() {
 
         {alerts.length === 0 && (
           <View style={styles.emptyAlertsWrap}>
-            <AlertBoxIcon width={118} height={86} />
+            <SubscriptionAlertIcon width={118} height={86} />
             <Text style={styles.emptyAlertsTitle}>No alerts yet</Text>
             <Text style={styles.emptyAlertsSubtitle}>No alerts - keep it up!</Text>
           </View>
@@ -303,10 +302,7 @@ export default function DashboardScreen() {
               }
             >
               <View style={styles.alertRow}>
-                <View style={styles.alertIconWrap}>
-                  <AlertIcon width={17} height={17} />
-                </View>
-
+                <SubscriptionAlertIcon width={44} height={44} style={styles.alertIconWrap} />
                 <View style={styles.alertContent}>
                   <View style={styles.alertMetaRow}>
                     <Text
@@ -612,12 +608,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   alertIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: theme.borderRadius.circle,
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: theme.spacing.md,
     marginTop: 2,
   },
@@ -632,11 +622,12 @@ const styles = StyleSheet.create({
   },
   alertType: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.fontSize.caption,
-    fontWeight: theme.fontWeight.semiBold,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
   },
   alertTypeCritical: {
-    color: theme.colors.danger,
+    color: theme.colors.textPrimary,
   },
   alertTypeWarning: {
     color: theme.colors.warning,
@@ -651,9 +642,9 @@ const styles = StyleSheet.create({
   },
   alertMessage: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.fontSize.body,
-    color: theme.colors.textPrimary,
-    lineHeight: 21,
+    fontSize: theme.fontSize.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
   centeredState: {
     flex: 1,
