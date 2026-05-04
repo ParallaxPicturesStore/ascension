@@ -99,7 +99,7 @@ export default function LoginScreen() {
                 style={styles.button}
               />
               <Text style={styles.infoText}>
-                {'Your partner invited you to help them stay accountable.  Sign in with the account you created when you accepted the invitation.'}
+                {'Your partner invited you to help them stay accountable. Sign in with the account you created when you accepted the invitation.'}
               </Text>
             </View>
 

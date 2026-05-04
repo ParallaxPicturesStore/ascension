@@ -40,7 +40,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authLoading || (session && partnerLoading)) return;
 
-    const onAuthScreen = segments[0] === 'login';
+    const onAuthScreen = segments[0] === 'login' || segments[0] === 'signup';
     const onConnectScreen = segments[0] === 'connect';
 
     if (!session) {
