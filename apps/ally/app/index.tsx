@@ -137,6 +137,7 @@ export default function HomeScreen() {
     [alerts],
   );
   const partnerName = partner?.name ?? 'Your partner';
+  const partnerCurrentStreak = partner?.streak?.current_streak ?? streak?.current_streak ?? 0;
 
   const renderScreenshotItem = useCallback(({ item }: { item: Screenshot }) => {
     return (
@@ -184,7 +185,7 @@ export default function HomeScreen() {
             <CalenderIcon />
             <Text style={styles.actionLabel}>Streak</Text>
             <View style={styles.actionMeta}>
-              <Text style={styles.actionCount}>{streak?.current_streak ?? 0}</Text>
+              <Text style={styles.actionCount}>{partnerCurrentStreak}</Text>
               <Text style={styles.actionType}>Days</Text>
             </View>
           </TouchableOpacity>
