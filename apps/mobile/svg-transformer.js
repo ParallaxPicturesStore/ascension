@@ -23,13 +23,3 @@ Module._resolveFilename = _resolveFilename;
 
 const upstreamTransformer = require('@expo/metro-config/babel-transformer');
 module.exports.transform = createTransformer(upstreamTransformer);
-
-		return upstreamTransformer.transform({
-			src: await transform(src, svgrConfig, { filePath: filename }),
-			filename,
-			...rest,
-		});
-	}
-
-	return upstreamTransformer.transform({ src, filename, ...rest });
-};

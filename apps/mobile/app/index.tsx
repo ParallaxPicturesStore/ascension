@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     minHeight: 98,
   },
   streakNumber: {
-    fontFamily: theme.typography.headingFamily,
+    fontFamily: theme.typography.phosphateSolid,
     fontSize: 50,
     lineHeight: 54,
     fontWeight: theme.fontWeight.bold,
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     height: 38,
     backgroundColor: '#AEC3FF',
     borderRadius: 132,
-    paddingHorizontal: 16,
+    // paddingHorizontal: 16,
     paddingVertical: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -470,8 +470,7 @@ const styles = StyleSheet.create({
   },
   longestPillText: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: theme.fontSize.bodyLg,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.textPrimary,
   },

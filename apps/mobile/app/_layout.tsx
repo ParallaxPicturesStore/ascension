@@ -343,6 +343,7 @@ export default function RootLayout() {
     'Afacad Flux Medium': AfacadFlux_500Medium,
     'Afacad Flux SemiBold': AfacadFlux_600SemiBold,
     'Afacad Flux Bold': AfacadFlux_700Bold,
+    'Phosphate-Solid': require('../assets/fonts/Phosphate-Solid.ttf'),
     'Nunito': Nunito_400Regular,
     'Nunito Medium': Nunito_500Medium,
     'Nunito SemiBold': Nunito_600SemiBold,

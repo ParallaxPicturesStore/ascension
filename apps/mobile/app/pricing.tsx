@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   heading: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.h1,
-    fontWeight: theme.fontWeight.bold,
+    fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
     marginBottom: theme.spacing.xs,
     lineHeight: theme.lineHeight.h1,
@@ -287,8 +287,8 @@ const styles = StyleSheet.create({
   },
   savingsBadgeText: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    fontWeight: theme.fontWeight.semiBold,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.regular,
     color: theme.colors.accent,
   },
   planName: {
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   planPrice: {
-    fontFamily: 'Phosphate',
+    fontFamily: theme.typography.phosphateSolid,
     fontSize: theme.fontSize.h1,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.foreground,
