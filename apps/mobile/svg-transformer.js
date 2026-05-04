@@ -1,33 +1,28 @@
 const path = require('path');
-const { resolveConfig, transform } = require('@svgr/core');
-const upstreamTransformer = require('@expo/metro-config/babel-transformer');
+const Module = require('module');
 
-const defaultSVGRConfig = {
-	native: true,
-	plugins: ['@svgr/plugin-svgo', '@svgr/plugin-jsx'],
-	svgoConfig: {
-		plugins: [
-			{
-				name: 'preset-default',
-				params: {
-					overrides: {
-						inlineStyles: {
-							onlyMatchedOnce: false,
-						},
-						removeViewBox: false,
-						removeUnknownsAndDefaults: false,
-						convertColors: false,
-					},
-				},
-			},
-		],
-	},
+// react-native-svg-transformer is hoisted to the monorepo root and can't
+// resolve @expo/metro-config from there. Redirect those lookups into the
+// app's own node_modules before the transformer module is evaluated.
+const appNodeModules = path.resolve(__dirname, 'node_modules');
+const _resolveFilename = Module._resolveFilename;
+Module._resolveFilename = function (request, parent, isMain, options) {
+  if (
+    request === '@expo/metro-config/babel-transformer' ||
+    request === '@react-native/metro-babel-transformer' ||
+    request === 'metro-react-native-babel-transformer'
+  ) {
+    const opts = { ...(options || {}), paths: [appNodeModules] };
+    return _resolveFilename.call(this, '@expo/metro-config/babel-transformer', parent, isMain, opts);
+  }
+  return _resolveFilename.call(this, request, parent, isMain, options);
 };
 
-module.exports.transform = async ({ src, filename, ...rest }) => {
-	if (filename.endsWith('.svg')) {
-		const config = await resolveConfig(path.dirname(filename));
-		const svgrConfig = config ? { ...defaultSVGRConfig, ...config } : defaultSVGRConfig;
+const { createTransformer } = require('react-native-svg-transformer');
+Module._resolveFilename = _resolveFilename;
+
+const upstreamTransformer = require('@expo/metro-config/babel-transformer');
+module.exports.transform = createTransformer(upstreamTransformer);
 
 		return upstreamTransformer.transform({
 			src: await transform(src, svgrConfig, { filePath: filename }),
