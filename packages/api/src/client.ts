@@ -5,6 +5,7 @@
 // ============================================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { calculateStreak } from '@ascension/shared';
 import type {
   AscensionApiConfig,
   AuthResult,
@@ -32,6 +33,28 @@ import type {
 function throwOnError<T>(result: { data: T; error: { message: string } | null }): T {
   if (result.error) throw new Error(result.error.message);
   return result.data;
+}
+
+/**
+ * Recompute current_streak from raw timestamp fields so the displayed value
+ * is always correct regardless of whether the daily increment job ran.
+ * Priority: last_relapse_date → streak_started_at → updated_at → stored value
+ */
+function normalizeStreak(streak: Streak | null): Streak | null {
+  if (!streak) return null;
+
+  const computed = calculateStreak({
+    lastRelapseDate: streak.last_relapse_date,
+    streakStartedAt: streak.streak_started_at,
+    updatedAt: streak.updated_at,
+    currentStreak: streak.current_streak,
+  });
+
+  return {
+    ...streak,
+    current_streak: computed,
+    longest_streak: Math.max(streak.longest_streak, computed),
+  };
 }
 
 // ── API Client Interface ────────────────────────────────────
@@ -322,24 +345,20 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
         .eq('user_id', partner.id)
         .single();
 
-      let normalizedStreak: Streak | null = streak ? (streak as Streak) : null;
+      // Compute current_streak from timestamps — do not trust the stored column.
+      let normalizedStreak: Streak | null = normalizeStreak(streak ? (streak as Streak) : null);
 
-      // If the stored longest_streak is behind current_streak, persist the
-      // correction via the edge function (admin key bypasses RLS so the ally
-      // user can fix the monitored user's row).
-      if (streak && streak.longest_streak < streak.current_streak) {
+      // If the stored longest_streak is still behind the computed value,
+      // persist the correction via the edge function (admin key bypasses RLS).
+      if (normalizedStreak && streak && streak.longest_streak < normalizedStreak.current_streak) {
         try {
           const fixed = await callEdgeFunction<Streak>('ascension-api', {
             action: 'streaks.syncLongest',
             payload: { user_id: partner.id },
           });
-          normalizedStreak = fixed;
+          normalizedStreak = normalizeStreak(fixed);
         } catch {
-          // Edge function not yet deployed — apply display correction only.
-          normalizedStreak = {
-            ...(streak as Streak),
-            longest_streak: streak.current_streak,
-          };
+          // Edge function not available — keep the already-normalized in-memory value.
         }
       }
 
@@ -519,34 +538,33 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
         throw new Error(error.message);
       }
 
-      const streak = data as Streak;
+      // Compute current_streak from timestamps — do not trust the stored column.
+      const normalized = normalizeStreak(data as Streak);
+      if (!normalized) return null;
 
-      // If longest_streak is behind current_streak, correct the DB row.
-      // The user owns their own streak row so the direct Supabase update
-      // goes through (RLS: FOR ALL USING auth.uid() = user_id).
-      if (streak.longest_streak < streak.current_streak) {
+      const stored = data as Streak;
+      const currentStreakChanged = normalized.current_streak !== stored.current_streak;
+      const longestStreakChanged = normalized.longest_streak > stored.longest_streak;
+
+      // Persist the computed values back to the DB when they differ from what
+      // is stored, so the column stays accurate for any other consumers.
+      if (currentStreakChanged || longestStreakChanged) {
         const { data: fixed, error: fixErr } = await supabase
           .from('streaks')
-          .update({ longest_streak: streak.current_streak })
+          .update({
+            current_streak: normalized.current_streak,
+            longest_streak: normalized.longest_streak,
+          })
           .eq('user_id', userId)
           .select('*')
           .single();
 
-        if (!fixErr && fixed) return fixed as Streak;
-
-        // Direct update failed (e.g. edge-deployed env) — try edge function.
-        try {
-          return await callEdgeFunction<Streak>('ascension-api', {
-            action: 'streaks.syncLongest',
-            payload: { user_id: userId },
-          });
-        } catch {
-          // Return in-memory corrected value so display is always right.
-          return { ...streak, longest_streak: streak.current_streak };
-        }
+        if (!fixErr && fixed) return normalizeStreak(fixed as Streak);
+        // If the update failed, return the in-memory normalized value so the
+        // display is still correct even if the write didn't land.
       }
 
-      return streak;
+      return normalized;
     },
 
     async syncLongest(userId, currentStreak, longestStreak) {
