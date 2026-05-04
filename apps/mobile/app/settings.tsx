@@ -289,7 +289,7 @@ export default function SettingsScreen() {
           {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled' || subscriptionStatus === 'expired') && (
             <Button
               title={managingSubscription ? 'Opening...' : 'Manage Subscription'}
-              variant="secondary"
+              variant="primary"
               onPress={handleManageSubscription}
               disabled={managingSubscription}
               style={styles.planButton}
@@ -451,7 +451,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.sm,
     fontWeight: theme.fontWeight.medium,
     fontSize: theme.fontSize.h2,
-    borderWidth : 0,
   },
   partnerSection: {
     gap: theme.spacing.md,
