@@ -73,7 +73,7 @@ let _platform: 'android' | 'ios' = 'android';
 let _lastSyncedBlockTimestamp = 0;
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
-const VPN_SYNC_INTERVAL_MS  = 2 * 60 * 1000; // sync blocked attempts every 2 minutes
+const VPN_SYNC_INTERVAL_MS  = 30 * 1000; // sync blocked attempts every 30 s
 
 // ---------------------------------------------------------------------------
 // Detection callbacks

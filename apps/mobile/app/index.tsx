@@ -41,7 +41,7 @@ export default function DashboardScreen() {
   const [subscriptionBlockReason, setSubscriptionBlockReason] = useState<'expired' | 'cancelled' | 'trial_expired' | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
 
     try {
       setError(null);

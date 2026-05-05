@@ -52,7 +52,9 @@ export default function SettingsScreen() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
+
+    const timer = setTimeout(() => setLoading(false), 5000);
 
     Promise.all([
       api.users.getProfile(user.id),
@@ -65,7 +67,7 @@ export default function SettingsScreen() {
         setPartnerEmail(profileData.partner_email ?? '');
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { clearTimeout(timer); setLoading(false); });
   }, [api, user]);
 
   const handleSaveName = async () => {

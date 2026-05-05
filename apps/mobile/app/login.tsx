@@ -30,6 +30,8 @@ export default function LoginScreen() {
       setError('Please enter your email and password.');
       return;
     }
+    console.log("LOgin");
+    
 
     setError(null);
     setLoading(true);
@@ -37,10 +39,14 @@ export default function LoginScreen() {
     try {
       const result = await signIn(email.trim().toLowerCase(), password);
       if (result.error) {
+        console.log(error);
+        
         setError(result.error);
       }
       // Auth state change will handle navigation
     } catch (err) {
+      console.log(err);
+      
       setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);

@@ -329,7 +329,32 @@ function AuthGate() {
 // Root layout
 // ---------------------------------------------------------------------------
 
+const INSTALL_FLAG_KEY = 'ascension_installed_v1';
+
+async function clearKeychainOnFreshInstall() {
+  try {
+    const flag = await SecureStore.getItemAsync(INSTALL_FLAG_KEY);
+    if (!flag) {
+      // Fresh install — Keychain may have stale session from previous install
+      const keysToDelete = [
+        'supabase.auth.token',
+        'supabase.auth.refreshToken',
+        'sb-flrllorqzmbztvtccvab-auth-token',
+        'sb-flrllorqzmbztvtccvab-auth-token-code-verifier',
+      ];
+      await Promise.all(keysToDelete.map((k) => SecureStore.deleteItemAsync(k).catch(() => {})));
+      await SecureStore.setItemAsync(INSTALL_FLAG_KEY, '1');
+    }
+  } catch {}
+}
+
 export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    clearKeychainOnFreshInstall().finally(() => setReady(true));
+  }, []);
+
   const api = useMemo(
     () => createApiClient({
       supabaseUrl: config.supabaseUrl,
@@ -350,7 +375,7 @@ export default function RootLayout() {
     'Nunito Bold': Nunito_700Bold,
   });
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !ready) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
