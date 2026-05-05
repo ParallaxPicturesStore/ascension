@@ -5,10 +5,12 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { useFonts, AfacadFlux_400Regular, AfacadFlux_500Medium, AfacadFlux_600SemiBold, AfacadFlux_700Bold } from '@expo-google-fonts/afacad-flux';
+import { Nunito_400Regular, Nunito_500Medium, Nunito_600SemiBold, Nunito_700Bold } from '@expo-google-fonts/nunito';
 import { theme } from '@ascension/ui';
 import { createApiClient } from '@ascension/api';
-import type { AscensionAPI, StorageAdapter } from '@ascension/api';
+import type { StorageAdapter } from '@ascension/api';
 import { useAuth } from '../src/hooks/useAuth';
+import { ApiProvider, useApi } from '../src/providers/ApiProvider';
 import { config } from '../src/config';
 import { startMonitoring, stopMonitoring, onDetection } from '../src/services/MonitoringService';
 import type { AnalysisResult } from '../src/services/ContentAnalyzer';
@@ -21,23 +23,25 @@ const secureStoreAdapter: StorageAdapter = {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
-// Inline ApiProvider to avoid React dual-instance issue in monorepo
-const ApiContext = createContext<AscensionAPI | null>(null);
-export function useApi(): AscensionAPI {
-  const api = useContext(ApiContext);
-  if (!api) throw new Error('useApi must be used within ApiProvider');
-  return api;
-}
-
 // ---------------------------------------------------------------------------
 // Onboarding context — lets child screens mark onboarding as done so the
 // routing effect doesn't redirect them back to /onboarding on navigate.
 // ---------------------------------------------------------------------------
 
-const OnboardingContext = createContext<{ completeOnboarding: () => void }>({
+const OnboardingContext = createContext<{
+  completeOnboarding: () => void;
+  completeMonitoringSetup: () => Promise<void>;
+  deferMonitoringSetup: () => void;
+}>({
   completeOnboarding: () => {},
+  completeMonitoringSetup: async () => {},
+  deferMonitoringSetup: () => {},
 });
 export function useOnboarding() { return useContext(OnboardingContext); }
+
+function monitoringSetupKey(userId: string): string {
+  return `monitoring_setup_done_${userId}`;
+}
 
 // ---------------------------------------------------------------------------
 // Auth gate + monitoring lifecycle
@@ -51,6 +55,9 @@ function AuthGate() {
   const [profileChecked, setProfileChecked] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [monitoringSetupChecked, setMonitoringSetupChecked] = useState(false);
+  const [monitoringSetupDone, setMonitoringSetupDone] = useState(false);
+  const [monitoringSetupDeferred, setMonitoringSetupDeferred] = useState(false);
 
   // Track whether we've started monitoring for this session
   const monitoringStarted = useRef(false);
@@ -66,6 +73,34 @@ function AuthGate() {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!session || !user) {
+      setMonitoringSetupChecked(true);
+      setMonitoringSetupDone(false);
+      setMonitoringSetupDeferred(false);
+      return;
+    }
+
+    setMonitoringSetupChecked(false);
+    SecureStore.getItemAsync(monitoringSetupKey(user.id))
+      .then((value) => {
+        if (cancelled) return;
+        setMonitoringSetupDone(value === 'true');
+        setMonitoringSetupChecked(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMonitoringSetupDone(false);
+        setMonitoringSetupChecked(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, user]);
+
   // Start monitoring once the user is authenticated and profile is complete
   useEffect(() => {
     if (!session || !user) {
@@ -79,7 +114,7 @@ function AuthGate() {
       return;
     }
 
-    if (!profileChecked || needsOnboarding || subscriptionExpired) {
+    if (!profileChecked || needsOnboarding || subscriptionExpired || !monitoringSetupChecked || !monitoringSetupDone) {
       if (subscriptionExpired && monitoringStarted.current) {
         monitoringStarted.current = false;
         stopMonitoring().catch((err) =>
@@ -118,13 +153,14 @@ function AuthGate() {
         ],
       );
     });
-  }, [session, user, profileChecked, needsOnboarding, subscriptionExpired]);
+  }, [session, user, profileChecked, needsOnboarding, subscriptionExpired, monitoringSetupChecked, monitoringSetupDone]);
 
   useEffect(() => {
     if (loading) return;
 
     const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
     const inOnboarding = segments[0] === 'onboarding';
+    const inSystemSetup = segments[0] === 'system-setup';
 
     if (!session) {
       if (!inAuthGroup) {
@@ -133,7 +169,14 @@ function AuthGate() {
       setProfileChecked(false);
       setNeedsOnboarding(false);
       setSubscriptionExpired(false);
+      setMonitoringSetupChecked(true);
+      setMonitoringSetupDone(false);
+      setMonitoringSetupDeferred(false);
       onboardingDone.current = false;
+      return;
+    }
+
+    if (!monitoringSetupChecked) {
       return;
     }
 
@@ -151,7 +194,12 @@ function AuthGate() {
 
           if (incomplete && !inOnboarding) {
             router.replace('/onboarding');
-          } else if (!incomplete && (inAuthGroup || inOnboarding)) {
+          } else if (!incomplete && !expired && !monitoringSetupDone && !monitoringSetupDeferred && !inSystemSetup) {
+            router.replace('/system-setup');
+          } else if (
+            !incomplete
+            && (inAuthGroup || inOnboarding)
+          ) {
             router.replace('/');
           }
         })
@@ -170,15 +218,57 @@ function AuthGate() {
     if (profileChecked) {
       if (needsOnboarding && !inOnboarding && !onboardingDone.current) {
         router.replace('/onboarding');
-      } else if (!needsOnboarding && (inAuthGroup || inOnboarding)) {
+      } else if (!needsOnboarding && !subscriptionExpired && !monitoringSetupDone && !monitoringSetupDeferred && !inSystemSetup) {
+        router.replace('/system-setup');
+      } else if (
+        !needsOnboarding
+        && (inAuthGroup || inOnboarding)
+      ) {
         router.replace('/');
       }
     }
-  }, [session, loading, segments, profileChecked, needsOnboarding, user, api, router]);
+  }, [
+    session,
+    loading,
+    segments,
+    profileChecked,
+    needsOnboarding,
+    subscriptionExpired,
+    user,
+    api,
+    router,
+    monitoringSetupChecked,
+    monitoringSetupDone,
+    monitoringSetupDeferred,
+  ]);
 
   const completeOnboarding = useCallback(() => {
     onboardingDone.current = true;
     setNeedsOnboarding(false);
+  }, []);
+
+  const completeMonitoringSetup = useCallback(async () => {
+    if (!session || !user) {
+      throw new Error('Missing active session');
+    }
+
+    if (!monitoringStarted.current) {
+      await startMonitoring(
+        user.id,
+        config.supabaseUrl,
+        session.access_token,
+        config.supabaseAnonKey,
+      );
+      monitoringStarted.current = true;
+    }
+
+    await SecureStore.setItemAsync(monitoringSetupKey(user.id), 'true');
+    setMonitoringSetupDone(true);
+    setMonitoringSetupDeferred(false);
+  }, [session, user]);
+
+  const deferMonitoringSetup = useCallback(() => {
+    setMonitoringSetupDeferred(true);
   }, []);
 
   if (loading) {
@@ -190,7 +280,13 @@ function AuthGate() {
   }
 
   return (
-    <OnboardingContext.Provider value={{ completeOnboarding }}>
+    <OnboardingContext.Provider
+      value={{
+        completeOnboarding,
+        completeMonitoringSetup,
+        deferMonitoringSetup,
+      }}
+    >
       <Slot />
 
       {/* Detection alert modal — shown when NSFW content is detected */}
@@ -247,6 +343,11 @@ export default function RootLayout() {
     'Afacad Flux Medium': AfacadFlux_500Medium,
     'Afacad Flux SemiBold': AfacadFlux_600SemiBold,
     'Afacad Flux Bold': AfacadFlux_700Bold,
+    'Phosphate-Solid': require('../assets/fonts/Phosphate-Solid.ttf'),
+    'Nunito': Nunito_400Regular,
+    'Nunito Medium': Nunito_500Medium,
+    'Nunito SemiBold': Nunito_600SemiBold,
+    'Nunito Bold': Nunito_700Bold,
   });
 
   if (!fontsLoaded) {
@@ -259,10 +360,10 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ApiContext.Provider value={api}>
+      <ApiProvider api={api}>
         <StatusBar style="dark" />
         <AuthGate />
-      </ApiContext.Provider>
+      </ApiProvider>
     </SafeAreaProvider>
   );
 }

@@ -1,27 +1,33 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform, Modal, Linking, Alert as RNAlert } from 'react-native';
+import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform, Linking, Alert as RNAlert, useWindowDimensions, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ScreenLayout,
-  StreakCounter,
-  AlertItem,
   Card,
-  Badge,
-  SectionHeader,
   Button,
   theme,
 } from '@ascension/ui';
 import type { Alert, Streak, ScreenshotStats, WeeklyStats } from '@ascension/api';
+import { ALERT_TYPE_LABELS, formatRelativeTime, getAlertSeverity, type AlertType } from '@ascension/shared';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
 import { vpnManager } from '../src/native/VPNManager';
 import { stopMonitoring } from '../src/services/MonitoringService';
 import { isSubscriptionExpired } from '../src/utils/subscription';
+import { SubscriptionSuspendedView } from '../src/components/SubscriptionSuspendedView';
+import SubscriptionAlertIcon from '../assets/icons/subscription_alert.svg';
+import BlockedSiteThisWeekIcon from '../assets/icons/blocked_site_this_week.svg';
+import BlockedSiteIcon from '../assets/icons/blocked_site.svg';
+import FlaggedIcon from '../assets/icons/flagged.svg';
 
 export default function DashboardScreen() {
   const api = useApi();
   const { user } = useAuth();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [streak, setStreak] = useState<Streak | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -119,238 +125,526 @@ export default function DashboardScreen() {
     ? vpnStatus === 'connected'
     : true; // Android monitoring managed by MonitoringService
 
+  const isCompact = width < 380;
+  const navWidth = Math.min(360, Math.max(304, width - 32));
+  const navBottomOffset = Math.max(insets.bottom + 12, 28);
+  const currentStreak = streak?.current_streak ?? 0;
+  const longestStreak = Math.max(streak?.longest_streak ?? 0, currentStreak);
+  const blockedThisWeek = weeklyStats?.blockedCount ?? 0;
+  const flaggedThisWeek = weeklyStats?.flaggedCount ?? 0;
+  const screenContentStyle = {
+    paddingTop: theme.spacing.sm,
+    paddingBottom: 168 + insets.bottom,
+  };
+
+  const showUnavailableTab = useCallback((label: string) => {
+    RNAlert.alert('Coming Soon', `${label} is not available in the mobile app yet.`);
+  }, []);
+
   if (loading) {
     return (
-      <ScreenLayout title="Dashboard" scrollable={false}>
-        <View style={styles.centeredState}>
-          <ActivityIndicator size="large" color={theme.colors.accent} />
-        </View>
-      </ScreenLayout>
+      <View style={styles.screenRoot}>
+        <ScreenLayout title="Dashboard" scrollable={false}>
+          <View style={styles.centeredState}>
+            <ActivityIndicator size="large" color={theme.colors.accent} />
+          </View>
+        </ScreenLayout>
+      </View>
     );
   }
 
   if (error && !streak && !stats) {
     return (
-      <ScreenLayout title="Dashboard" scrollable={false}>
-        <View style={styles.centeredState}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Button
-            title="Try Again"
-            variant="secondary"
-            onPress={loadData}
-            style={styles.retryButton}
-          />
-        </View>
-      </ScreenLayout>
+      <View style={styles.screenRoot}>
+        <ScreenLayout title="Dashboard" scrollable={false}>
+          <View style={styles.centeredState}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Button
+              title="Try Again"
+              variant="secondary"
+              onPress={loadData}
+              style={styles.retryButton}
+            />
+          </View>
+        </ScreenLayout>
+      </View>
     );
   }
 
   if (subscriptionExpired) {
-    const modalTitle =
-      subscriptionBlockReason === 'trial_expired'
-        ? 'Trial Expired'
-        : subscriptionBlockReason === 'cancelled'
-        ? 'Subscription Cancelled'
-        : 'Subscription Ended';
+    const suspendedReason = subscriptionBlockReason ?? 'expired';
 
-    const modalBody =
-      subscriptionBlockReason === 'trial_expired'
-        ? 'Your 7-day free trial has expired. Subscribe to keep monitoring active and your partner informed.'
-        : subscriptionBlockReason === 'cancelled'
-        ? 'You have cancelled your subscription. Monitoring has been paused. Renew to keep your partner informed.'
-        : 'Your subscription has ended, so screen sharing and monitoring are turned off.';
-
-    const modalButtonTitle =
-      subscriptionBlockReason === 'trial_expired' ? 'View Plans' : 'Manage Subscription';
-
-    const handleModalAction =
-      subscriptionBlockReason === 'trial_expired'
+    const handleSuspendedAction =
+      suspendedReason === 'trial_expired'
         ? () => router.push('/pricing')
         : handleManageSubscription;
 
     return (
-      <ScreenLayout title="Dashboard" scrollable={false}>
-        <Modal visible transparent animationType="fade">
-          <View style={styles.subscriptionModalOverlay}>
-            <Card style={styles.subscriptionModalCard}>
-              <Text style={styles.subscriptionModalTitle}>{modalTitle}</Text>
-              <Text style={styles.subscriptionModalBody}>{modalBody}</Text>
-              <Button
-                title={modalButtonTitle}
-                onPress={handleModalAction}
-                style={styles.subscriptionModalButton}
-              />
-            </Card>
-          </View>
-        </Modal>
-      </ScreenLayout>
+      <View style={styles.screenRoot}>
+        <ScreenLayout title="Dashboard" scrollable={false}>
+          <SubscriptionSuspendedView
+            reason={suspendedReason}
+            onPrimaryAction={handleSuspendedAction}
+          />
+        </ScreenLayout>
+      </View>
     );
   }
 
   return (
-    <ScreenLayout
-      title="Dashboard"
-      scrollable
-      style={styles.screen}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={theme.colors.accent}
-        />
-      }
-    >
-      {/* Monitoring status */}
-      <View style={styles.statusRow}>
-        <Badge
-          text={monitoringActive ? 'Monitoring Active' : 'Monitoring Paused'}
-          variant={monitoringActive ? 'success' : 'warning'}
-        />
-      </View>
+    <View style={styles.screenRoot}>
+      <ScreenLayout
+        title={undefined}
+        scrollable
+        style={screenContentStyle}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.accent}
+          />
+        }
+      >
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Dashboard</Text>
+          <View style={styles.statusRightWrap}>
+            <View
+              style={[
+                styles.statusDot,
+                monitoringActive ? styles.statusDotActive : styles.statusDotPaused,
+              ]}
+            />
+            <Text style={styles.statusText}>
+              {monitoringActive ? 'Monitoring active' : 'Monitoring paused'}
+            </Text>
+          </View>
+        </View>
 
-      {/* Streak */}
-      <Card style={styles.streakCard}>
-        <StreakCounter
-          currentStreak={streak?.current_streak ?? 0}
-          longestStreak={Math.max(streak?.longest_streak ?? 0, streak?.current_streak ?? 0)}
-        />
-      </Card>
-
-      {/* Quick stats */}
-      <View style={styles.statsRow}>
-        <Card style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats?.totalCaptures ?? 0}</Text>
-          <Text style={styles.statLabel}>Screenshots</Text>
-        </Card>
-        <Card style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {weeklyStats?.blockedCount ?? 0}
-          </Text>
-          <Text style={styles.statLabel}>Blocked This Week</Text>
-        </Card>
-      </View>
-
-      {/* Weekly summary */}
-      {weeklyStats && (
-        <Card style={styles.weeklyCard}>
-          <View style={styles.weeklyRow}>
-            <View style={styles.weeklyItem}>
-              <Text style={styles.weeklyNumber}>{weeklyStats.screenshotCount}</Text>
-              <Text style={styles.weeklyLabel}>Captures</Text>
+        <View style={styles.streakCard}>
+          <View style={styles.streakRow}>
+            <View>
+              <Text style={styles.streakNumber}>{currentStreak}</Text>
+              <Text style={styles.streakLabel}>Days</Text>
             </View>
-            <View style={styles.weeklyDivider} />
-            <View style={styles.weeklyItem}>
-              <Text style={styles.weeklyNumber}>{weeklyStats.blockedCount}</Text>
-              <Text style={styles.weeklyLabel}>Blocked</Text>
-            </View>
-            <View style={styles.weeklyDivider} />
-            <View style={styles.weeklyItem}>
-              <Text style={[styles.weeklyNumber, weeklyStats.flaggedCount > 0 && styles.flaggedNumber]}>
-                {weeklyStats.flaggedCount}
-              </Text>
-              <Text style={styles.weeklyLabel}>Flagged</Text>
+            <View style={styles.longestPill}>
+              <Text style={styles.longestPillText}>Longest: {longestStreak} days</Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.weeklyHeader}>
+          <Text style={styles.weeklyTitle}>This week</Text>
+          <Text style={styles.weeklySubtitle}>Activity overview for the past 7 days.</Text>
+        </View>
+
+        <Card style={styles.primaryMetricCard}>
+          <View style={styles.bigMetricRow}>
+            <View style={styles.metricCopy}>
+              <Text style={styles.bigMetricNumber}>{blockedThisWeek}</Text>
+              <Text style={styles.bigMetricLabel}>Blocked this week</Text>
+            </View>
+            <BlockedSiteThisWeekIcon
+              width={isCompact ? 108 : 134}
+              height={isCompact ? 84 : 104}
+            />
+          </View>
         </Card>
-      )}
 
-      {/* Recent alerts */}
-      <SectionHeader
-        title="Recent Alerts"
-        subtitle={alerts.length === 0 ? 'No alerts - keep it up!' : undefined}
-        style={styles.sectionHeader}
-      />
+        <View style={[styles.secondaryMetricsRow, isCompact && styles.secondaryMetricsColumn]}>
+          <View style={styles.secondaryMetricCard}>
+            <View style={styles.metricCopy}>
+              <Text style={styles.secondaryMetricNumber}>{blockedThisWeek}</Text>
+              <Text style={styles.secondaryMetricLabel}>Blocked</Text>
+            </View>
+            <BlockedSiteIcon
+              width={isCompact ? 92 : 100}
+              height={isCompact ? 66 : 80}
+              style={styles.secondaryMetricIcon}
+            />
+          </View>
 
-      {alerts.map((alert) => (
-        <AlertItem
-          key={alert.id}
-          type={alert.type}
-          message={alert.message}
-          timestamp={alert.timestamp}
-          read={alert.read}
-        />
-      ))}
+          <View style={styles.secondaryMetricCard}>
+            <View style={styles.metricCopy}>
+              <Text style={styles.secondaryMetricNumber}>{flaggedThisWeek}</Text>
+              <Text style={styles.secondaryMetricLabel}>Flagged</Text>
+            </View>
+            <FlaggedIcon
+              width={isCompact ? 76 : 88}
+              height={isCompact ? 74 : 86}
+              style={styles.secondaryMetricIcon}
+            />
+          </View>
+        </View>
 
-      {/* Settings shortcut */}
-      <View style={styles.bottomActions}>
-        <Button
-          title="Settings"
-          variant="secondary"
+        <View style={styles.alertsSectionHeader}>
+          <Text style={styles.alertsSectionTitle}>Recent alerts</Text>
+        </View>
+
+        {alerts.length === 0 && (
+          <View style={styles.emptyAlertsWrap}>
+            <SubscriptionAlertIcon width={118} height={86} />
+            <Text style={styles.emptyAlertsTitle}>No alerts yet</Text>
+            <Text style={styles.emptyAlertsSubtitle}>No alerts - keep it up!</Text>
+          </View>
+        )}
+
+        {alerts.map((alert) => {
+          const severity = getAlertSeverity(alert.type as AlertType);
+          const typeLabel = ALERT_TYPE_LABELS[alert.type as AlertType] || alert.type;
+
+          return (
+            <Card
+              key={alert.id}
+              style={
+                !alert.read
+                  ? { ...styles.alertCard, ...styles.alertCardUnread }
+                  : styles.alertCard
+              }
+            >
+              <View style={styles.alertRow}>
+                <SubscriptionAlertIcon width={44} height={44} style={styles.alertIconWrap} />
+                <View style={styles.alertContent}>
+                  <View style={styles.alertMetaRow}>
+                    <Text
+                      style={[
+                        styles.alertType,
+                        severity === 'critical'
+                          ? styles.alertTypeCritical
+                          : severity === 'warning'
+                          ? styles.alertTypeWarning
+                          : styles.alertTypeInfo,
+                      ]}
+                    >
+                      {typeLabel}
+                    </Text>
+                    <Text style={styles.alertTime}>{formatRelativeTime(alert.timestamp)}</Text>
+                  </View>
+
+                  <Text numberOfLines={2} style={styles.alertMessage}>
+                    {alert.message}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          );
+        })}
+      </ScreenLayout>
+
+      <View
+        style={[
+          styles.bottomNav,
+          {
+            width: navWidth,
+            marginLeft: -navWidth / 2,
+            bottom: navBottomOffset,
+          },
+        ]}
+      >
+        <Pressable
+          onPress={() => router.push('/')}
+          style={[styles.navItem, styles.navItemActive]}
+          accessibilityRole="button"
+          accessibilityLabel="Go to dashboard"
+        >
+          <Ionicons name="home-outline" size={23} color="#FFFFFF" />
+        </Pressable>
+
+        <Pressable
+          onPress={() => showUnavailableTab('Connect')}
+          style={styles.navItem}
+          accessibilityRole="button"
+          accessibilityLabel="Connect tab coming soon"
+        >
+          <Ionicons name="search-outline" size={27} color="#11131A" />
+        </Pressable>
+
+        <Pressable
+          onPress={() => showUnavailableTab('Alerts')}
+          style={styles.navItem}
+          accessibilityRole="button"
+          accessibilityLabel="Alerts tab coming soon"
+        >
+          <Ionicons name="notifications-outline" size={25} color="#11131A" />
+        </Pressable>
+
+        <Pressable
           onPress={() => router.push('/settings')}
-        />
+          style={styles.navItem}
+          accessibilityRole="button"
+          accessibilityLabel="Go to settings"
+        >
+          <Ionicons name="settings-outline" size={25} color="#11131A" />
+        </Pressable>
       </View>
-    </ScreenLayout>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    paddingTop: theme.spacing.sm,
+  screenRoot: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
-  statusRow: {
+  headerRow: {
     flexDirection: 'row',
-    marginBottom: theme.spacing.lg,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 22,
+  },
+  headerTitle: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
+  },
+  statusRightWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 11,
+    height: 11,
+    borderRadius: theme.borderRadius.circle,
+  },
+  statusDotActive: {
+    backgroundColor: '#74B66A',
+  },
+  statusDotPaused: {
+    backgroundColor: theme.colors.warning,
+  },
+  statusText: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.textPrimary,
   },
   streakCard: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    width: '100%',
+    minHeight: 148,
+    borderRadius: 32,
+    paddingHorizontal: 26,
+    paddingVertical: 24,
+    backgroundColor: '#EEF3FF',
   },
-  statsRow: {
+  streakRow: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    minHeight: 98,
   },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.h2,
+  streakNumber: {
+    fontFamily: theme.typography.phosphateSolid,
+    fontSize: 50,
+    lineHeight: 54,
     fontWeight: theme.fontWeight.bold,
-    color: theme.colors.foreground,
+    color: theme.colors.textPrimary,
   },
-  statLabel: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    color: theme.colors.muted,
+  streakLabel: {
     marginTop: theme.spacing.xs,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.textPrimary,
   },
-  weeklyCard: {
-    marginBottom: theme.spacing.lg,
-  },
-  weeklyRow: {
-    flexDirection: 'row',
+  longestPill: {
+    flexDirection: 'column',
+    width: 154,
+    height: 38,
+    backgroundColor: '#AEC3FF',
+    borderRadius: 132,
+    // paddingHorizontal: 16,
+    paddingVertical: 8,
+    justifyContent: 'center',
     alignItems: 'center',
+    flexGrow: 0,
+    flexShrink: 0,
   },
-  weeklyItem: {
-    flex: 1,
-    alignItems: 'center',
+  longestPillText: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
   },
-  weeklyDivider: {
-    width: 1,
-    height: theme.spacing.xl,
-    backgroundColor: theme.colors.cardBorder,
+  weeklyHeader: {
+    marginBottom: 18,
   },
-  weeklyNumber: {
-    fontFamily: theme.fontFamily,
+  weeklyTitle: {
+    fontFamily: theme.typography.headingFamily,
     fontSize: theme.fontSize.h3,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.foreground,
+    lineHeight: 28,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
   },
-  flaggedNumber: {
-    color: theme.colors.danger,
-  },
-  weeklyLabel: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.caption,
-    color: theme.colors.muted,
-    marginTop: theme.spacing.xs,
-  },
-  sectionHeader: {
+  weeklySubtitle: {
     marginTop: theme.spacing.sm,
+    fontFamily: theme.typography.bodyFamily,
+    fontWeight: theme.fontWeight.regular,
+    fontSize: theme.fontSize.body,
+    color: '#5C616C',
   },
-  bottomActions: {
-    marginTop: theme.spacing.xl,
+  primaryMetricCard: {
+    marginBottom: theme.spacing.md,
+    backgroundColor: '#F7F9FF',
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  bigMetricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    minHeight: 112,
+  },
+  metricCopy: {
+    flexShrink: 1,
+  },
+  bigMetricNumber: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.fontSize.h1,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
+  },
+  bigMetricLabel: {
+    marginTop: theme.spacing.sm,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    lineHeight: 22,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.textPrimary,
+  },
+  secondaryMetricsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+
+  },
+  secondaryMetricsColumn: {
+    flexDirection: 'column',
+  },
+  secondaryMetricCard: {
+    flex: 1,
+    backgroundColor: '#F7F9FF',
+    borderRadius: theme.borderRadius.card,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+    overflow: 'hidden',
+    padding: theme.spacing.base,
+  },
+  secondaryMetricInner: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  secondaryMetricIcon: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+  },
+  secondaryMetricLabel: {
+    marginTop: theme.spacing.sm,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.textPrimary,
+  },
+  secondaryMetricNumber: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.fontSize.h1,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
+  },
+  alertsSectionHeader: {
+    marginTop: 8,
+    marginBottom: theme.spacing.base,
+  },
+  alertsSectionTitle: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.fontSize.h2,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
+  },
+  emptyAlertsWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 56,
+    paddingBottom: 72,
+  },
+  emptyAlertsTitle: {
+    marginTop: theme.spacing.base,
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.textPrimary,
+  },
+  emptyAlertsSubtitle: {
+    marginTop: theme.spacing.sm,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: 16,
+    lineHeight: 22,
+    color: '#555861',
+  },
+  alertCard: {
+    marginBottom: theme.spacing.sm,
+    backgroundColor: '#F7F9FF',
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  alertCardUnread: {
+    backgroundColor: theme.colors.accentLight,
+    borderColor: theme.colors.infoBorderSoft,
+  },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  alertIconWrap: {
+    marginRight: theme.spacing.md,
+    marginTop: 2,
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.xs,
+  },
+  alertType: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.textPrimary,
+  },
+  alertTypeCritical: {
+    color: theme.colors.textPrimary,
+  },
+  alertTypeWarning: {
+    color: theme.colors.warning,
+  },
+  alertTypeInfo: {
+    color: theme.colors.textSecondary,
+  },
+  alertTime: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.caption,
+    color: theme.colors.textSecondary,
+  },
+  alertMessage: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.caption,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
   centeredState: {
     flex: 1,
@@ -359,9 +653,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
   },
   errorText: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: theme.spacing.base,
@@ -369,32 +663,25 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: theme.spacing.sm,
   },
-  subscriptionModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
+  bottomNav: {
+    position: 'absolute',
+    left: '50%',
+    height: 72,
+    backgroundColor: '#DCDDFF',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    padding: theme.spacing.lg,
   },
-  subscriptionModalCard: {
-    width: '100%',
-    maxWidth: 420,
+  navItem: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  subscriptionModalTitle: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.h3,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.foreground,
-    marginBottom: theme.spacing.sm,
-  },
-  subscriptionModalBody: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
-    lineHeight: 22,
-    marginBottom: theme.spacing.base,
-  },
-  subscriptionModalButton: {
-    marginTop: theme.spacing.sm,
+  navItemActive: {
+    backgroundColor: '#2A479E',
   },
 });

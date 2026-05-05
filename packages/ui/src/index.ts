@@ -7,6 +7,7 @@ export { Card, type CardProps } from './components/Card';
 export { Input, type InputProps } from './components/Input';
 export { Badge, type BadgeProps, type BadgeVariant } from './components/Badge';
 export { ScreenLayout, type ScreenLayoutProps } from './components/ScreenLayout';
+export { Header, type HeaderProps } from './components/Header';
 export { SectionHeader, type SectionHeaderProps } from './components/SectionHeader';
 export { StreakCounter, type StreakCounterProps } from './components/StreakCounter';
 export { AlertItem, type AlertItemProps } from './components/AlertItem';

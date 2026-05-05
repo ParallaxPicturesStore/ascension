@@ -36,6 +36,9 @@ const styles = StyleSheet.create({
   },
   body: {
     padding: theme.spacing.base,
+    fontSize : theme.fontSize.body,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.cardText,
   },
   footer: {
     paddingHorizontal: theme.spacing.base,
