@@ -2,7 +2,6 @@ import React from 'react';
 import { StyleSheet, View, Text, type ViewStyle } from 'react-native';
 import { theme } from '../theme';
 import { type AlertType, ALERT_TYPE_ICONS, ALERT_TYPE_LABELS, formatRelativeTime, getAlertSeverity } from '@ascension/shared';
-import { WarningIcon } from '@/assets/icons';
 
 export interface AlertItemProps {
   type: AlertType | string;
@@ -25,8 +24,7 @@ export const AlertItem = React.memo(function AlertItem({ type, message, timestam
 
   return (
     <View style={[styles.container, !read && styles.unread, style]}>
-      {/* <Text style={styles.icon}>{icon}</Text> */}
-      <WarningIcon/>
+      <Text style={styles.icon}>{icon}</Text>
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={[styles.type]}>{label}</Text>

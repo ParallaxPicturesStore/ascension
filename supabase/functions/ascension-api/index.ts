@@ -777,6 +777,123 @@ const actions: Record<string, ActionHandler> = {
     return jsonResponse({ success: true });
   },
 
+  // ── blocked_attempts.logAndAlert ──
+  // Called by the iOS VPN extension (when app is closed) and by the main app
+  // sync loop. Creates a partner alert in DB, resets streak, and emails partner.
+  "blocked_attempts.logAndAlert": async (payload, callerId) => {
+    const { user_id, domain, blocked_at } = payload as {
+      user_id: string;
+      domain: string;
+      blocked_at: string;
+    };
+
+    if (!user_id || !domain) return errorResponse("user_id and domain are required", 400);
+    if (user_id !== callerId) return errorResponse("Cannot log blocks for another user", 403);
+
+    const { data: user, error: userErr } = await adminDb
+      .from("users")
+      .select("name, partner_id, partner_email")
+      .eq("id", user_id)
+      .single();
+
+    if (userErr || !user) return errorResponse("User not found", 404);
+
+    const userName = (user.name as string | null) ?? "User";
+    const partnerId = user.partner_id as string | null;
+    const partnerEmail = user.partner_email as string | null;
+
+    if (partnerId) {
+      await adminDb.from("alerts").insert({
+        user_id,
+        partner_id: partnerId,
+        type: "vpn_block",
+        message: `Attempted to access blocked site: ${domain}`,
+      });
+    }
+
+    const { data: streak } = await adminDb
+      .from("streaks")
+      .select("current_streak, longest_streak")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    if (streak) {
+      await adminDb.from("streaks").update({
+        current_streak: 0,
+        last_relapse_date: new Date().toISOString(),
+        longest_streak: Math.max(
+          (streak.longest_streak as number) ?? 0,
+          (streak.current_streak as number) ?? 0,
+        ),
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user_id);
+    }
+
+    if (partnerEmail) {
+      const now = blocked_at ? new Date(blocked_at) : new Date();
+      const template = EMAIL_TEMPLATES["attempted_access"];
+      if (template) {
+        const html = template.html(userName, {
+          time: now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          date: now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+          url: domain,
+        });
+        await sendEmailViaResend(partnerEmail, template.subject(userName), html);
+      }
+    }
+
+    return jsonResponse({ success: true });
+  },
+
+  // ── monitoring.heartbeat ── (alias so AntiTamper.ts calls succeed)
+  "monitoring.heartbeat": async (payload, callerId) => {
+    const { user_id } = payload as { user_id: string };
+    if (!user_id) return errorResponse("user_id is required", 400);
+    if (user_id !== callerId) return errorResponse("Cannot send heartbeat for another user", 403);
+    const { error } = await adminDb
+      .from("users")
+      .update({ last_heartbeat: new Date().toISOString() })
+      .eq("id", user_id);
+    if (error) return errorResponse(error.message, 500);
+    return jsonResponse({ success: true });
+  },
+
+  // ── monitoring.reportEvasion ──
+  "monitoring.reportEvasion": async (payload, callerId) => {
+    const { user_id, reason, platform } = payload as {
+      user_id: string;
+      reason: string;
+      platform?: string;
+    };
+    if (!user_id) return errorResponse("user_id is required", 400);
+    if (user_id !== callerId) return errorResponse("Cannot report evasion for another user", 403);
+
+    const { data: user } = await adminDb
+      .from("users")
+      .select("name, partner_email")
+      .eq("id", user_id)
+      .single();
+
+    const userName = (user?.name as string | null) ?? "User";
+    const partnerEmail = user?.partner_email as string | null;
+
+    if (partnerEmail) {
+      const template = EMAIL_TEMPLATES["evasion"];
+      if (template) {
+        const now = new Date();
+        const html = template.html(userName, {
+          action: reason ?? "disabled",
+          platform: platform ?? "unknown",
+          time: now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          date: now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+        });
+        await sendEmailViaResend(partnerEmail, template.subject(userName), html);
+      }
+    }
+
+    return jsonResponse({ success: true });
+  },
+
   // ── watchdog.heartbeat ──
   "watchdog.heartbeat": async (payload, callerId) => {
     const { user_id } = payload as { user_id: string };

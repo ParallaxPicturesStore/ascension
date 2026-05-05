@@ -137,8 +137,11 @@ export async function reportEvasion(
 // ---------------------------------------------------------------------------
 
 /**
- * Report a domain blocked by the iOS VPN DNS filter.
- * Inserts into blocked_attempts, creates a partner alert, and sends email.
+ * Report a domain blocked by the VPN DNS filter.
+ * Calls blocked_attempts.logAndAlert which logs the block, creates a partner
+ * alert in the DB, resets the streak, and emails the partner.
+ * This is the fallback path for blocks the extension couldn't report directly
+ * (e.g. token was expired at block time).
  */
 export async function reportVPNBlock(
   userId: string,
@@ -149,7 +152,7 @@ export async function reportVPNBlock(
   blockedAt: number, // Unix seconds
 ): Promise<void> {
   console.warn(`[AntiTamper] VPN BLOCK user=${userId} domain=${domain}`);
-  await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'blocked_attempts.log', {
+  await callApi(supabaseUrl, userAccessToken, supabaseAnonKey, 'blocked_attempts.logAndAlert', {
     user_id: userId,
     domain,
     blocked_at: new Date(blockedAt * 1000).toISOString(),

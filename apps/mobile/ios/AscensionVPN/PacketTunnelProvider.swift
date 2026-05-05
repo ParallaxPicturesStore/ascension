@@ -48,9 +48,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         ipv4Settings.excludedRoutes = []
         settings.ipv4Settings = ipv4Settings
 
-        // Set our tunnel as the DNS resolver
-        // Upstream DNS: Cloudflare (1.1.1.1) and Google (8.8.8.8)
-        let dnsSettings = NEDNSSettings(servers: ["1.1.1.1", "8.8.8.8"])
+        // Cloudflare Family DNS — blocks adult content at the resolver level
+        let dnsSettings = NEDNSSettings(servers: ["1.1.3.3", "1.0.0.3"])
         dnsSettings.matchDomains = [""] // Match all domains
         settings.dnsSettings = dnsSettings
 
@@ -79,6 +78,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     /// Process an individual IP packet. If it contains a DNS query for a
     /// blocked domain, respond with 0.0.0.0. Otherwise, forward it.
     private func processPacket(_ packet: Data, protocolFamily: NSNumber) {
+        // Drop packets destined for known DoH servers (port 443) to force
+        // the OS to fall back to plain UDP DNS on port 53, which we intercept.
+        if isDoHPacket(packet) {
+            return
+        }
+
         // We need at least an IP header (20 bytes) + UDP header (8 bytes) + DNS header (12 bytes)
         guard packet.count >= 40 else {
             // Too small to be a DNS packet, pass through
@@ -103,7 +108,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         // Check against blocklist
         if blocklist.isDomainBlocked(domain) {
             os_log("BLOCKED: %{public}@", log: log, type: .info, domain)
-            blocklist.logBlockedAttempt(domain: domain)
+            let blockTimestamp = Date().timeIntervalSince1970
+            blocklist.logBlockedAttempt(domain: domain, timestamp: blockTimestamp)
+
+            // Fire partner alert via Supabase — works even when the main app is closed
+            reportBlockedDomain(domain, timestamp: blockTimestamp)
 
             // Craft a DNS response pointing to 0.0.0.0
             if let response = craftBlockedDNSResponse(originalPacket: packet) {
@@ -117,6 +126,27 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     // MARK: - DNS Parsing
+
+    // Known DoH server IPs — drop TCP/443 traffic to these to force plain DNS
+    private let dohServerIPs: Set<String> = [
+        "1.1.1.1", "1.0.0.1",       // Cloudflare
+        "8.8.8.8", "8.8.4.4",       // Google
+        "9.9.9.9", "149.112.112.112" // Quad9
+    ]
+
+    /// Returns true if the packet is a TCP connection to a known DoH server on port 443.
+    private func isDoHPacket(_ packet: Data) -> Bool {
+        guard packet.count >= 20 else { return false }
+        let ipHeaderLength = Int(packet[0] & 0x0F) * 4
+        guard packet[9] == 6 else { return false } // TCP only
+        guard packet.count >= ipHeaderLength + 4 else { return false }
+
+        let dstPort = UInt16(packet[ipHeaderLength + 2]) << 8 | UInt16(packet[ipHeaderLength + 3])
+        guard dstPort == 443 else { return false }
+
+        let ip = "\(packet[16]).\(packet[17]).\(packet[18]).\(packet[19])"
+        return dohServerIPs.contains(ip)
+    }
 
     /// Check if the packet is a UDP packet destined for DNS (port 53).
     private func isUDPDNSQuery(_ packet: Data) -> Bool {
@@ -249,5 +279,66 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         response[11] = UInt8(checksumValue & 0xFF)
 
         return response
+    }
+
+    // MARK: - Partner Alert Reporting
+
+    private let reportQueue = DispatchQueue(label: "app.getascension.vpn.report", qos: .utility)
+
+    /// Call the Supabase edge function to log the block and alert the partner.
+    /// Runs off the packet-processing path so it never delays DNS responses.
+    /// On success, marks the entry as reported so the main app's sync loop skips it.
+    private func reportBlockedDomain(_ domain: String, timestamp: TimeInterval) {
+        reportQueue.async { [weak self] in
+            guard let self = self,
+                  let defaults = UserDefaults(suiteName: BlocklistManager.appGroupID),
+                  let supabaseUrl = defaults.string(forKey: "supabaseUrl"),
+                  let userAccessToken = defaults.string(forKey: "userAccessToken"),
+                  let supabaseAnonKey = defaults.string(forKey: "supabaseAnonKey"),
+                  let userId = defaults.string(forKey: "userId"),
+                  !supabaseUrl.isEmpty, !userAccessToken.isEmpty, !userId.isEmpty
+            else {
+                os_log("No credentials in App Group — skipping direct report for %{public}@", log: self?.log ?? .default, type: .debug, domain)
+                return
+            }
+
+            let urlString = "\(supabaseUrl)/functions/v1/ascension-api"
+            guard let url = URL(string: urlString) else { return }
+
+            let iso = ISO8601DateFormatter()
+            let blockedAtStr = iso.string(from: Date(timeIntervalSince1970: timestamp))
+
+            let body: [String: Any] = [
+                "action": "blocked_attempts.logAndAlert",
+                "payload": [
+                    "user_id": userId,
+                    "domain": domain,
+                    "blocked_at": blockedAtStr,
+                ],
+            ]
+
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(userAccessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+            request.httpBody = bodyData
+            request.timeoutInterval = 15
+
+            URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
+                if let error = error {
+                    os_log("Direct report failed: %{public}@", log: self?.log ?? .default, type: .error, error.localizedDescription)
+                    return
+                }
+                if let http = response as? HTTPURLResponse {
+                    os_log("Direct report %{public}@ → HTTP %d", log: self?.log ?? .default, type: .info, domain, http.statusCode)
+                    if http.statusCode == 200 {
+                        BlocklistManager.shared.markAsReported(domain: domain, timestamp: timestamp)
+                    }
+                }
+            }.resume()
+        }
     }
 }

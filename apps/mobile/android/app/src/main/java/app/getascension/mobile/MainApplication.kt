@@ -1,6 +1,7 @@
 package app.getascension.mobile
 
 import app.getascension.mobile.capture.ScreenCapturePackage
+import app.getascension.mobile.vpn.VpnPackage
 
 import android.app.Application
 import android.content.res.Configuration
@@ -26,6 +27,7 @@ class MainApplication : Application(), ReactApplication {
           override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
             packages.add(ScreenCapturePackage())
+            packages.add(VpnPackage())
             return packages
           }
 

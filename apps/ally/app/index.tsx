@@ -107,22 +107,27 @@ export default function HomeScreen() {
       setScreenshotsLoading(false);
     }
   }, [api, session?.user?.id]);
+  const loadSettings = useCallback(async () => {
+    if (!session?.user?.id) return;
+    try {
+      const profile = await api.users.getProfile(session.user.id);
+      const settings = profile.notification_settings ?? {};
+      setRulesCount(Object.values(settings).filter(Boolean).length);
+    } catch {
+      // Silently handle
+    }
+  }, [api, session?.user?.id]);
 
   React.useEffect(() => {
     loadScreenshots();
   }, [loadScreenshots]);
 
   React.useEffect(() => {
-    if (!session?.user?.id) return;
-    api.users.getProfile(session.user.id).then((profile) => {
-      const settings = profile.notification_settings ?? {};
-      setRulesCount(Object.values(settings).filter(Boolean).length);
-    }).catch(() => {});
-  }, [api, session?.user?.id]);
-
+    loadSettings();
+  }, [loadSettings]);
   const handleRefresh = useCallback(async () => {
-    await Promise.all([refresh(), loadScreenshots()]);
-  }, [refresh, loadScreenshots]);
+    await Promise.all([refresh(), loadScreenshots(), loadSettings()]);
+  }, [refresh, loadScreenshots, loadSettings]);
 
   const filteredScreenshots = useMemo(
     () =>

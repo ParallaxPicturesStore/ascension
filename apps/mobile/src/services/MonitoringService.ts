@@ -10,9 +10,10 @@
  *   5. Emit detections to any registered callbacks (e.g. for in-app alerts)
  *
  * Platform notes:
- *   Android - screen capture via MediaProjection + cloud NSFW analysis
- *   iOS     - VPN/DNS filtering is handled natively by the network extension;
- *             this service only runs the heartbeat loop on iOS
+ *   Android - VPN/DNS filtering (AscensionVpnService) blocks sites at OS level,
+ *             including incognito tabs. Also runs MediaProjection + cloud NSFW
+ *             analysis for screen content.
+ *   iOS     - VPN/DNS filtering via NEPacketTunnelProvider network extension.
  */
 import { Platform } from 'react-native';
 import {
@@ -122,22 +123,31 @@ export async function startMonitoring(
   _supabaseAnonKey = supabaseAnonKey;
   _platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
-  // iOS: start the VPN DNS filter tunnel + begin syncing blocked attempts
+  // iOS only: start the VPN DNS filter tunnel + begin syncing blocked attempts
   if (Platform.OS === 'ios') {
-    const started = await vpnManager.startVPN();
-    console.log(`[MonitoringService] VPN tunnel ${started ? 'started' : 'already running'}`);
+    if (vpnManager.isAvailable) {
+      // Store credentials in the App Group so the iOS VPN extension can call
+      // Supabase directly and fire partner alerts even when the app is closed.
+      await vpnManager.storeCredentials(userId, supabaseUrl, userAccessToken, supabaseAnonKey)
+        .catch(() => {});
 
-    // Reset the sync cursor to now so we only forward new blocks going forward
-    const existing = await vpnManager.getRecentBlocked();
-    _lastSyncedBlockTimestamp = existing.length > 0
-      ? Math.max(...existing.map((e) => e.timestamp))
-      : Math.floor(Date.now() / 1000);
+      const started = await vpnManager.startVPN();
+      console.log(`[MonitoringService] VPN tunnel ${started ? 'started' : 'already running or denied'}`);
 
-    vpnSyncInterval = setInterval(() => {
-      syncVPNBlocks().catch((err) =>
-        console.warn('[MonitoringService] VPN sync failed:', err),
-      );
-    }, VPN_SYNC_INTERVAL_MS);
+      // Seed the cursor so we only report blocks that happen after this start
+      const existing = await vpnManager.getRecentBlocked();
+      _lastSyncedBlockTimestamp = existing.length > 0
+        ? Math.max(...existing.map((e) => e.timestamp))
+        : Math.floor(Date.now() / 1000);
+
+      vpnSyncInterval = setInterval(() => {
+        syncVPNBlocks().catch((err) =>
+          console.warn('[MonitoringService] VPN sync failed:', err),
+        );
+      }, VPN_SYNC_INTERVAL_MS);
+    } else {
+      console.warn('[MonitoringService] VPN module not available on this platform/build');
+    }
   }
 
   // Android-only: load model (no-op for API-based analyzer) and start capture
@@ -200,7 +210,7 @@ export async function stopMonitoring(): Promise<void> {
     heartbeatInterval = null;
   }
 
-  if (Platform.OS === 'ios') {
+  if (vpnManager.isAvailable) {
     if (vpnSyncInterval) {
       clearInterval(vpnSyncInterval);
       vpnSyncInterval = null;
@@ -224,9 +234,11 @@ export async function stopMonitoring(): Promise<void> {
 
 /**
  * Update the user's access token (call this after a token refresh).
+ * Also refreshes the token stored in the App Group for the VPN extension.
  */
 export function updateAccessToken(newToken: string): void {
   _userAccessToken = newToken;
+  vpnManager.storeCredentials(_userId, _supabaseUrl, newToken, _supabaseAnonKey).catch(() => {});
 }
 
 /**

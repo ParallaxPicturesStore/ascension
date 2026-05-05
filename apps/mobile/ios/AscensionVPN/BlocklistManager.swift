@@ -200,7 +200,7 @@ final class BlocklistManager {
 
     /// Log a blocked domain attempt to the shared App Group container.
     /// Both the VPN extension and the main app can read this data.
-    func logBlockedAttempt(domain: String) {
+    func logBlockedAttempt(domain: String, timestamp: TimeInterval = Date().timeIntervalSince1970) {
         guard let defaults = UserDefaults(suiteName: BlocklistManager.appGroupID) else { return }
 
         // Increment total count
@@ -211,7 +211,8 @@ final class BlocklistManager {
         var log = defaults.array(forKey: BlocklistManager.blockedLogKey) as? [[String: Any]] ?? []
         let entry: [String: Any] = [
             "domain": domain,
-            "timestamp": Date().timeIntervalSince1970,
+            "timestamp": timestamp,
+            "reportedToServer": false,
         ]
         log.append(entry)
 
@@ -229,9 +230,28 @@ final class BlocklistManager {
         return defaults.integer(forKey: BlocklistManager.blockedCountKey)
     }
 
-    /// Get recent blocked attempts (domain + timestamp).
+    /// Get recent blocked attempts that have NOT yet been reported to the server.
+    /// The extension marks each entry as reported after a successful API call,
+    /// so the main app's sync loop only picks up any that slipped through.
     func getRecentBlocked() -> [[String: Any]] {
         guard let defaults = UserDefaults(suiteName: BlocklistManager.appGroupID) else { return [] }
-        return defaults.array(forKey: BlocklistManager.blockedLogKey) as? [[String: Any]] ?? []
+        let all = defaults.array(forKey: BlocklistManager.blockedLogKey) as? [[String: Any]] ?? []
+        return all.filter { ($0["reportedToServer"] as? Bool) != true }
+    }
+
+    /// Mark a blocked attempt as successfully reported so it is not re-reported
+    /// by the main app's sync loop.
+    func markAsReported(domain: String, timestamp: TimeInterval) {
+        guard let defaults = UserDefaults(suiteName: BlocklistManager.appGroupID) else { return }
+        var log = defaults.array(forKey: BlocklistManager.blockedLogKey) as? [[String: Any]] ?? []
+        for i in 0..<log.count {
+            if let ts = log[i]["timestamp"] as? TimeInterval,
+               let d = log[i]["domain"] as? String,
+               abs(ts - timestamp) < 0.1, d == domain {
+                log[i]["reportedToServer"] = true
+                break
+            }
+        }
+        defaults.set(log, forKey: BlocklistManager.blockedLogKey)
     }
 }
