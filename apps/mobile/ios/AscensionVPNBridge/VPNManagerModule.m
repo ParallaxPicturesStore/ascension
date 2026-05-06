@@ -33,4 +33,9 @@ RCT_EXTERN_METHOD(storeCredentials:
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(updateBlocklist:
+                  (NSArray<NSString *> *)domains
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 @end
