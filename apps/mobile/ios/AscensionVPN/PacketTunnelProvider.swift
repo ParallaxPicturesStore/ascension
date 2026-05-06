@@ -47,14 +47,20 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         // intercept DNS queries for reporting. All other traffic (HTTP/HTTPS)
         // flows through WiFi/cellular unaffected.
         let ipv4Settings = NEIPv4Settings(addresses: ["10.0.0.1"], subnetMasks: ["255.255.255.0"])
+        // Route only our tunnel DNS IP through the tunnel so we intercept all queries.
+        // We use regular Cloudflare (1.1.1.1) — NOT Family DNS — so Google SafeSearch
+        // is NOT enforced. This means users can see adult sites in search results,
+        // but the moment they click through, the DNS query fires and the partner is alerted.
+        // Our local blocklist + NXDOMAIN detection handles the actual blocking.
         ipv4Settings.includedRoutes = [
-            NEIPv4Route(destinationAddress: "1.1.3.3", subnetMask: "255.255.255.255"),
-            NEIPv4Route(destinationAddress: "1.0.0.3", subnetMask: "255.255.255.255"),
+            NEIPv4Route(destinationAddress: "1.1.1.1", subnetMask: "255.255.255.255"),
+            NEIPv4Route(destinationAddress: "1.0.0.1", subnetMask: "255.255.255.255"),
         ]
         settings.ipv4Settings = ipv4Settings
 
-        // Cloudflare Family DNS — blocks adult content at the resolver level.
-        let dnsSettings = NEDNSSettings(servers: ["1.1.3.3", "1.0.0.3"])
+        // Regular Cloudflare DNS (no SafeSearch enforcement).
+        // Blocking is done by our PacketTunnelProvider via the local blocklist.
+        let dnsSettings = NEDNSSettings(servers: ["1.1.1.1", "1.0.0.1"])
         dnsSettings.matchDomains = [""]
         settings.dnsSettings = dnsSettings
 
@@ -338,85 +344,88 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
     // MARK: - DNS Forwarding
 
-    private let dnsQueue = DispatchQueue(label: "app.getascension.vpn.dns", qos: .userInitiated, attributes: .concurrent)
+    // Retain active NWConnections so they aren't deallocated before the response arrives
+    private var activeConnections = [ObjectIdentifier: NWConnection]()
+    private let connectionsLock = NSLock()
 
-    /// Forward a DNS query packet to Google DNS (8.8.8.8:53) — NOT in our tunnel routes,
-    /// so this goes through the real network interface and avoids the routing loop.
+    /// Forward a DNS query to Cloudflare Family DNS (1.1.3.3).
+    /// NWConnection in a NEPacketTunnelProvider is guaranteed by Apple to bypass
+    /// the VPN tunnel, so there is no routing loop even though 1.1.3.3 is in our routes.
+    /// Cloudflare Family DNS blocks millions of adult domains automatically — we detect
+    /// NXDOMAIN responses here to log Cloudflare-blocked domains the same as local-list ones.
     private func forwardDNS(packet: Data, protocolFamily: NSNumber) {
         let ipHeaderLength = Int(packet[0] & 0x0F) * 4
         let udpOffset = ipHeaderLength
-        guard packet.count >= udpOffset + 8 else {
-            os_log("forwardDNS: packet too small (%d bytes), dropping", log: log, type: .error, packet.count)
-            return
-        }
+        guard packet.count >= udpOffset + 8 else { return }
 
         let srcPort = UInt16(packet[udpOffset]) << 8 | UInt16(packet[udpOffset + 1])
         let srcIPBytes: [UInt8] = [packet[12], packet[13], packet[14], packet[15]]
         let dstIPBytes: [UInt8] = [packet[16], packet[17], packet[18], packet[19]]
         let dnsPayload = packet.subdata(in: (udpOffset + 8)..<packet.count)
+        guard !dnsPayload.isEmpty else { return }
 
-        guard !dnsPayload.isEmpty else {
-            os_log("forwardDNS: empty DNS payload, dropping", log: log, type: .error)
-            return
-        }
+        let domain = extractDomainFromDNS(packet) ?? "<unknown>"
+        os_log("forwardDNS: -> 1.1.3.3 query for %{public}@ (%d bytes)", log: log, type: .debug, domain, dnsPayload.count)
 
-        os_log("forwardDNS: -> Cloudflare %d-byte query srcPort=%d", log: log, type: .info, dnsPayload.count, srcPort)
+        let endpoint = NWEndpoint.hostPort(host: "1.1.1.1", port: 53)
+        let conn = NWConnection(to: endpoint, using: .udp)
 
-        dnsQueue.async { [weak self] in
+        connectionsLock.lock()
+        activeConnections[ObjectIdentifier(conn)] = conn
+        connectionsLock.unlock()
+
+        conn.stateUpdateHandler = { [weak self] state in
             guard let self = self else { return }
-
-            // Open a UDP socket to Cloudflare Family DNS
-            let sock = Darwin.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-            guard sock >= 0 else {
-                os_log("forwardDNS: socket() failed errno=%d", log: self.log, type: .error, errno)
-                return
-            }
-            defer { Darwin.close(sock) }
-
-            // 5-second receive timeout
-            var tv = timeval(tv_sec: 5, tv_usec: 0)
-            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-
-            // Set destination: 1.1.3.3:53
-            var dest = sockaddr_in()
-            dest.sin_family = sa_family_t(AF_INET)
-            dest.sin_port = in_port_t(53).bigEndian
-            dest.sin_addr.s_addr = UInt32(0x08080808).bigEndian // 8.8.8.8 — not in our tunnel routes
-
-            let sendResult = dnsPayload.withUnsafeBytes { buf -> Int in
-                withUnsafePointer(to: &dest) { destPtr -> Int in
-                    destPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
-                        Darwin.sendto(sock, buf.baseAddress, buf.count, 0, sockPtr, socklen_t(MemoryLayout<sockaddr_in>.size))
+            switch state {
+            case .ready:
+                conn.send(content: dnsPayload, completion: .contentProcessed { error in
+                    if let error = error {
+                        os_log("forwardDNS: send error: %{public}@", log: self.log, type: .error, error.localizedDescription)
+                        self.removeConnection(conn)
+                        return
                     }
-                }
+                    conn.receiveMessage { data, _, _, error in
+                        defer { self.removeConnection(conn) }
+                        guard let responsePayload = data, responsePayload.count >= 4, error == nil else {
+                            os_log("forwardDNS: receive error: %{public}@", log: self.log, type: .error, error?.localizedDescription ?? "empty")
+                            return
+                        }
+                        // Detect NXDOMAIN (RCODE=3) — Cloudflare blocked this domain
+                        let rcode = responsePayload[3] & 0x0F
+                        if rcode == 3 {
+                            os_log("forwardDNS: DNS NXDOMAIN for %{public}@", log: self.log, type: .info, domain)
+                            let ts = Date().timeIntervalSince1970
+                            let lastLog = self.lastReportedTimestamp[domain] ?? 0
+                            if ts - lastLog >= self.reportDedupeInterval {
+                                self.lastReportedTimestamp[domain] = ts
+                                self.blocklist.logBlockedAttempt(domain: domain, timestamp: ts)
+                            }
+                        }
+                        os_log("forwardDNS: <- 1.1.3.3 %d bytes rcode=%d", log: self.log, type: .debug, responsePayload.count, rcode)
+                        self.buildAndDeliverDNSResponse(
+                            dnsPayload: responsePayload,
+                            srcIPBytes: srcIPBytes,
+                            dstIPBytes: dstIPBytes,
+                            originalSrcPort: srcPort,
+                            protocolFamily: protocolFamily
+                        )
+                    }
+                })
+            case .failed(let error):
+                os_log("forwardDNS: connection failed: %{public}@", log: self.log, type: .error, error.localizedDescription)
+                self.removeConnection(conn)
+            default:
+                break
             }
-
-            guard sendResult > 0 else {
-                os_log("forwardDNS: sendto() failed errno=%d", log: self.log, type: .error, errno)
-                return
-            }
-            os_log("forwardDNS: sent %d bytes to Cloudflare", log: self.log, type: .debug, sendResult)
-
-            // Receive Cloudflare's response (max 512 bytes for plain UDP DNS)
-            var responseBuffer = [UInt8](repeating: 0, count: 512)
-            let recvResult = Darwin.recv(sock, &responseBuffer, responseBuffer.count, 0)
-
-            guard recvResult > 0 else {
-                os_log("forwardDNS: recv() failed or timed out errno=%d", log: self.log, type: .error, errno)
-                return
-            }
-
-            let responsePayload = Data(responseBuffer.prefix(recvResult))
-            os_log("forwardDNS: <- Cloudflare %d-byte response", log: self.log, type: .info, recvResult)
-
-            self.buildAndDeliverDNSResponse(
-                dnsPayload: responsePayload,
-                srcIPBytes: srcIPBytes,
-                dstIPBytes: dstIPBytes,
-                originalSrcPort: srcPort,
-                protocolFamily: protocolFamily
-            )
         }
+        conn.start(queue: .global(qos: .userInitiated))
+    }
+
+    private func removeConnection(_ conn: NWConnection) {
+        conn.cancel()
+        connectionsLock.lock()
+        activeConnections.removeValue(forKey: ObjectIdentifier(conn))
+        connectionsLock.unlock()
     }
 
     /// Wrap a raw DNS response payload in IP+UDP headers and deliver it via the tunnel's packet flow.

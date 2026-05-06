@@ -172,28 +172,42 @@ final class BlocklistManager {
 
     /// Check if a domain should be blocked.
     /// Handles exact match and wildcard subdomain matching.
+    /// Cloud-synced blocklist written by the main app via updateBlocklist().
+    /// Loaded fresh from App Group each time the extension process starts.
+    private var cloudBlocklist: Set<String> = {
+        let domains = UserDefaults(suiteName: BlocklistManager.appGroupID)?
+            .stringArray(forKey: "cloudBlocklist") ?? []
+        return Set(domains.map { $0.lowercased() })
+    }()
+
     /// For example, if "pornhub.com" is in the set, then
     /// "www.pornhub.com", "m.pornhub.com", and "pornhub.com" all match.
     func isDomainBlocked(_ domain: String) -> Bool {
         let lowered = domain.lowercased()
 
-        // Exact match
-        if blockedDomains.contains(lowered) {
+        // Exact match — hardcoded list or cloud list
+        if blockedDomains.contains(lowered) || cloudBlocklist.contains(lowered) {
             return true
         }
 
-        // Walk up the domain hierarchy to check parent domains.
-        // e.g. "cdn.www.pornhub.com" -> "www.pornhub.com" -> "pornhub.com"
+        // Walk up domain hierarchy: "cdn.www.pornhub.com" -> "pornhub.com"
         var parts = lowered.split(separator: ".")
         while parts.count > 2 {
             parts.removeFirst()
             let parent = parts.joined(separator: ".")
-            if blockedDomains.contains(parent) {
+            if blockedDomains.contains(parent) || cloudBlocklist.contains(parent) {
                 return true
             }
         }
 
         return false
+    }
+
+    /// Reload cloud blocklist from App Group after the main app writes a new one.
+    func reloadCloudBlocklist() {
+        let domains = UserDefaults(suiteName: BlocklistManager.appGroupID)?
+            .stringArray(forKey: "cloudBlocklist") ?? []
+        cloudBlocklist = Set(domains.map { $0.lowercased() })
     }
 
     // MARK: - Shared Logging (App Group)

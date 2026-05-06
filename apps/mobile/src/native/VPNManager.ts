@@ -14,6 +14,7 @@ interface VPNManagerNative {
   getBlockedCount(): Promise<number>;
   getRecentBlocked(): Promise<BlockedEntry[]>;
   storeCredentials(userId: string, supabaseUrl: string, userAccessToken: string, supabaseAnonKey: string): Promise<boolean>;
+  updateBlocklist(domains: string[]): Promise<boolean>;
 }
 
 interface AndroidVpnNative {
@@ -132,6 +133,7 @@ class VPNManager {
    */
   async updateBlocklist(domains: string[]): Promise<void> {
     try {
+      if (this.ios) await this.ios.updateBlocklist(domains);
       if (this.android) await this.android.updateBlocklist(domains);
     } catch (error) {
       console.error('[VPNManager] Failed to update blocklist:', error);

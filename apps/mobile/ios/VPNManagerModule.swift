@@ -76,6 +76,20 @@ class VPNManagerModule: NSObject {
         resolve(true)
     }
 
+    /// Write the cloud-synced blocklist into the App Group so the VPN extension picks it up.
+    @objc func updateBlocklist(
+        _ domains: [String],
+        resolver resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let defaults = UserDefaults(suiteName: "group.app.getascension") else {
+            reject("BLOCKLIST_ERROR", "Could not access App Group", nil)
+            return
+        }
+        defaults.set(domains, forKey: "cloudBlocklist")
+        resolve(true)
+    }
+
     /// Start the VPN tunnel. Resolves true on success, false on failure.
     @objc func startVPN(
         _ resolve: @escaping RCTPromiseResolveBlock,

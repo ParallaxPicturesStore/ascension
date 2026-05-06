@@ -799,17 +799,15 @@ const actions: Record<string, ActionHandler> = {
     if (userErr || !user) return errorResponse("User not found", 404);
 
     const userName = (user.name as string | null) ?? "User";
-    const partnerId = user.partner_id as string | null;
     const partnerEmail = user.partner_email as string | null;
 
-    if (partnerId) {
-      await adminDb.from("alerts").insert({
-        user_id,
-        partner_id: partnerId,
-        type: "vpn_block",
-        message: `Attempted to access blocked site: ${domain}`,
-      });
-    }
+    // Log to blocked_attempts table
+    await adminDb.from("blocked_attempts").insert({
+      user_id,
+      url: domain,
+      timestamp: blocked_at ?? new Date().toISOString(),
+      blocked_successfully: true,
+    });
 
     const { data: streak } = await adminDb
       .from("streaks")
