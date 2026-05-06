@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Card, Header, ScreenLayout, theme } from '@ascension/ui';
 import LockIcon from '../assets/icons/lock.svg';
 import ProtectedIcon from '../assets/icons/protected.svg';
 import { useOnboarding } from './_layout';
+import { vpnManager } from '../src/native/VPNManager';
 
 export default function SystemSetupScreen() {
   const router = useRouter();
@@ -12,6 +13,16 @@ export default function SystemSetupScreen() {
   const [activating, setActivating] = useState(false);
   const [activationError, setActivationError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(Platform.OS === 'ios');
+
+  // On iOS, if VPN is already connected go straight to dashboard
+  useEffect(() => {
+    if (Platform.OS !== 'ios') { setChecking(false); return; }
+    vpnManager.getVPNStatus().then((status) => {
+      if (status === 'connected') router.replace('/');
+      else setChecking(false);
+    }).catch(() => setChecking(false));
+  }, []);
 
   const handleEnableMonitoring = async () => {
     setActivationError(null);
@@ -19,7 +30,7 @@ export default function SystemSetupScreen() {
     try {
       await completeMonitoringSetup();
       setReady(true);
-    } catch (error) {
+    } catch {
       setActivationError('Could not enable monitoring. Please try again.');
     } finally {
       setActivating(false);
@@ -31,6 +42,16 @@ export default function SystemSetupScreen() {
     router.replace('/');
   };
 
+  if (checking) {
+    return (
+      <ScreenLayout scrollable={false}>
+        <View style={styles.successContainer}>
+          <ActivityIndicator size="large" color={theme.colors.accent} />
+        </View>
+      </ScreenLayout>
+    );
+  }
+
   if (ready) {
     return (
       <ScreenLayout scrollable={false}>
@@ -40,7 +61,11 @@ export default function SystemSetupScreen() {
           <ProtectedIcon width={96} height={96} style={styles.successBadge} />
 
           <Text style={styles.successHeading}>You're protected</Text>
-          <Text style={styles.successSubheading}>Monitoring is now active.</Text>
+          <Text style={styles.successSubheading}>
+            {Platform.OS === 'ios'
+              ? 'VPN is active. All DNS filtering is running.'
+              : 'Monitoring is now active.'}
+          </Text>
 
           <Button
             title="Go to dashboard"
@@ -63,16 +88,26 @@ export default function SystemSetupScreen() {
         </Text>
 
         <Card style={styles.stepsCard}>
-          <Text style={styles.stepsTitle}>Steps list</Text>
-          <Text style={styles.stepText}>1. Enable screen recording.</Text>
-          <Text style={styles.stepText}>2. Allow accessibility access.</Text>
-          <Text style={styles.stepText}>3. Allow notifications.</Text>
+          <Text style={styles.stepsTitle}>What happens next</Text>
+          {Platform.OS === 'ios' ? (
+            <>
+              <Text style={styles.stepText}>1. Tap Enable monitoring below.</Text>
+              <Text style={styles.stepText}>2. Allow the VPN configuration when prompted.</Text>
+              <Text style={styles.stepText}>3. That's it — all adult sites will be blocked.</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.stepText}>1. Enable screen recording.</Text>
+              <Text style={styles.stepText}>2. Allow accessibility access.</Text>
+              <Text style={styles.stepText}>3. Allow notifications.</Text>
+            </>
+          )}
         </Card>
 
         {activationError && <Text style={styles.errorText}>{activationError}</Text>}
 
         <Button
-          title={activating ? 'Enabling monitoring...' : ' Enable monitoring'}
+          title={activating ? 'Enabling monitoring...' : 'Enable monitoring'}
           onPress={handleEnableMonitoring}
           disabled={activating}
           leftSlot={<LockIcon width={15} height={20} />}
@@ -89,7 +124,11 @@ export default function SystemSetupScreen() {
         {activating && (
           <View style={styles.loaderRow}>
             <ActivityIndicator color={theme.colors.accent} />
-            <Text style={styles.loaderText}>Waiting for system permission...</Text>
+            <Text style={styles.loaderText}>
+              {Platform.OS === 'ios'
+                ? 'Waiting for VPN permission...'
+                : 'Waiting for system permission...'}
+            </Text>
           </View>
         )}
       </View>
