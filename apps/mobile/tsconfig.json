@@ -2,6 +2,7 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "skipLibCheck": true,
     "paths": {
       "@ascension/shared": ["../../packages/shared/src"],
       "@ascension/ui": ["../../packages/ui/src"],

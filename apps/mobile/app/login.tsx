@@ -1,12 +1,24 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, BackHandler, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ScreenLayout, Input, Button, theme } from '@ascension/ui';
+import { ScreenLayout, Input, Button, BackButton, theme } from '@ascension/ui';
 import { useAuth } from '../src/hooks/useAuth';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
+
+  const handleBackPress = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    if (Platform.OS === 'android') {
+      BackHandler.exitApp();
+      return;
+    }
+    router.replace('/');
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,105 +49,178 @@ export default function LoginScreen() {
 
   return (
     <ScreenLayout scrollable={false}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.logo}>Ascension</Text>
-          <Text style={styles.subtitle}>Welcome back</Text>
-        </View>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            <View style={styles.topSection}>
+              <BackButton onPress={handleBackPress} style={styles.backButton} />
 
-        <View style={styles.form}>
-          <Input
-            label="Email"
-            placeholder="your@email.com"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-          />
+              <View style={styles.header}>
+                <Text style={styles.logo}>Ascension</Text>
+                <Text style={styles.subtitle}>Welcome back. Stay the course.</Text>
+              </View>
+            </View>
 
-          <Input
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="password"
-            textContentType="password"
-          />
+            <View style={styles.form}>
+              <Input
+                label="Email address"
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+              />
 
-          {error && <Text style={styles.error}>{error}</Text>}
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="password"
+                textContentType="password"
+              />
 
-          <Button
-            title={loading ? 'Signing in...' : 'Sign In'}
-            onPress={handleSignIn}
-            disabled={loading}
-            style={styles.button}
-          />
-        </View>
+              {error && <Text style={styles.error}>{error}</Text>}
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
-          <TouchableOpacity onPress={() => router.push('/signup')}>
-            <Text style={styles.link}>Sign Up</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+              <Button
+                title={loading ? 'Signing in...' : 'Sign in'}
+                onPress={handleSignIn}
+                disabled={loading}
+                style={styles.button}
+              />
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Don't have an account?</Text>
+              <TouchableOpacity onPress={() => router.push('/signup')}>
+                <Text style={styles.link}>Sign up</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: theme.spacing.lg,
+    justifyContent: 'flex-start',
+  },
+  topSection: {
+    marginBottom: theme.spacing.xl,
+  },
+  backButton: {
+    marginBottom: theme.spacing.xl,
   },
   header: {
-    alignItems: 'center',
-    marginBottom: theme.spacing['2xl'],
+    alignItems: 'flex-start',
   },
   logo: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.headingFamily,
     fontSize: theme.fontSize.h1,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.accent,
+    lineHeight: theme.lineHeight.h1,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
   subtitle: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.bodyLg,
-    color: theme.colors.muted,
+    lineHeight: theme.lineHeight.bodyLg,
+    color: theme.colors.textSecondary,
   },
   form: {
-    marginBottom: theme.spacing.xl,
+    gap: theme.spacing.base,
+  },
+  forgotPasswordRow: {
+    alignItems: 'flex-end',
+    marginTop: -4,
+  },
+  forgotPasswordText: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    lineHeight: theme.lineHeight.body,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.primary,
   },
   error: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.caption,
     color: theme.colors.danger,
-    textAlign: 'center',
-    marginBottom: theme.spacing.base,
+    lineHeight: theme.lineHeight.caption,
   },
   button: {
     marginTop: theme.spacing.sm,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  dividerText: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    lineHeight: theme.lineHeight.body,
+    color: theme.colors.textSecondary,
+    marginHorizontal: theme.spacing.md,
+  },
+  socialButton: {
+    marginTop: theme.spacing.xs,
+  },
+  googleMark: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.primary,
+  },
+  appleMark: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.surface,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
+    marginTop: 'auto',
+    paddingBottom: theme.spacing.sm,
   },
   footerText: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    lineHeight: theme.lineHeight.body,
+    color: theme.colors.textPrimary,
   },
   link: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.body,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.accent,
+    lineHeight: theme.lineHeight.body,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.primary,
   },
 });

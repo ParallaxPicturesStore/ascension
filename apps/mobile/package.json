@@ -5,15 +5,20 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios"
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@ascension/api": "*",
     "@ascension/monitoring": "*",
     "@ascension/shared": "*",
     "@ascension/ui": "*",
+    "@expo-google-fonts/afacad-flux": "^0.4.2",
+    "@expo-google-fonts/nunito": "^0.4.2",
+    "@expo/vector-icons": "^14.1.0",
     "expo": "~53.0.0",
+    "expo-font": "~13.3.2",
+    "expo-image-manipulator": "^55.0.15",
     "expo-linking": "~7.1.7",
     "expo-notifications": "~0.31.5",
     "expo-router": "~5.1.11",
@@ -24,10 +29,12 @@
     "react-native": "0.79.6",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
+    "react-native-svg": "^15.15.4",
     "react-native-web": "^0.20.0"
   },
   "devDependencies": {
     "@types/react": "~19.0.10",
+    "react-native-svg-transformer": "^1.5.3",
     "typescript": "~5.8.3"
   }
 }

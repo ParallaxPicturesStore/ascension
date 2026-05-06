@@ -36,6 +36,7 @@ export function usePartner(userId: string | undefined): PartnerState {
       const partnerData = await api.users.getPartnerData(userId);
       setPartner(partnerData);
 
+      console.log("session user id : " , userId);      
       if (partnerData) {
         setStreak(partnerData.streak);
 

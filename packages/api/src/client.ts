@@ -5,6 +5,7 @@
 // ============================================================
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { calculateStreak } from '@ascension/shared';
 import type {
   AscensionApiConfig,
   AuthResult,
@@ -16,7 +17,6 @@ import type {
   ScreenshotStats,
   Alert,
   CreateAlert,
-  AlertType,
   BlockedAttempt,
   Streak,
   WeeklyStats,
@@ -33,6 +33,28 @@ import type {
 function throwOnError<T>(result: { data: T; error: { message: string } | null }): T {
   if (result.error) throw new Error(result.error.message);
   return result.data;
+}
+
+/**
+ * Recompute current_streak from raw timestamp fields so the displayed value
+ * is always correct regardless of whether the daily increment job ran.
+ * Priority: last_relapse_date → streak_started_at → updated_at → stored value
+ */
+function normalizeStreak(streak: Streak | null): Streak | null {
+  if (!streak) return null;
+
+  const computed = calculateStreak({
+    lastRelapseDate: streak.last_relapse_date,
+    streakStartedAt: streak.streak_started_at,
+    updatedAt: streak.updated_at,
+    currentStreak: streak.current_streak,
+  });
+
+  return {
+    ...streak,
+    current_streak: computed,
+    longest_streak: Math.max(streak.longest_streak, computed),
+  };
 }
 
 // ── API Client Interface ────────────────────────────────────
@@ -54,19 +76,24 @@ export interface AscensionAPI {
   users: {
     getProfile(userId: string): Promise<UserProfile>;
     updateProfile(userId: string, data: Partial<UserProfile>): Promise<void>;
+    linkByInvite(inviteCode: string): Promise<void>;
     getPartnerData(userId: string): Promise<PartnerData | null>;
     setQuitPassword(userId: string, passwordHash: string): Promise<void>;
     getQuitPasswordHash(userId: string): Promise<string | null>;
+    updateUserPartnerId(inviteCode: string, data: { partner_id: string }): Promise<void>;
   };
 
   screenshots: {
     log(data: ScreenshotLog): Promise<void>;
     getRecent(userId: string, limit?: number): Promise<Screenshot[]>;
+    getRecentByPartner(partnerId: string, limit?: number): Promise<Screenshot[]>;
+    getSignedUrl(filePath: string, expiresIn?: number): Promise<string | null>;
     getStats(userId: string): Promise<ScreenshotStats>;
   };
 
   alerts: {
     create(data: CreateAlert): Promise<void>;
+    invitePartner(partnerEmail: string, inviteCode: string, userName: string): Promise<void>;
     getForPartner(partnerId: string): Promise<Alert[]>;
     getForUser(userId: string): Promise<Alert[]>;
     markRead(alertId: string): Promise<void>;
@@ -74,6 +101,7 @@ export interface AscensionAPI {
 
   streaks: {
     get(userId: string): Promise<Streak | null>;
+    syncLongest(userId: string, currentStreak: number, longestStreak: number): Promise<Streak>;
     reset(userId: string): Promise<Streak>;
     increment(userId: string): Promise<Streak>;
     getWeeklyStats(userId: string): Promise<WeeklyStats>;
@@ -110,7 +138,14 @@ export interface AscensionAPI {
 // ── Factory ─────────────────────────────────────────────────
 
 export function createApiClient(config: AscensionApiConfig): AscensionAPI {
-  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      storage: config.storage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  });
   const functionsBase = config.functionsBaseUrl ?? `${config.supabaseUrl}/functions/v1`;
 
   // Helper to call Edge Functions with the user's access token
@@ -145,6 +180,10 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
     async signUp(email, password) {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) return { user: null, session: null, error: error.message };
+      // Supabase returns an empty identities array instead of an error when the email is already registered
+      if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+        return { user: null, session: null, error: 'An account with this email already exists. Please sign in instead.' };
+      }
       return {
         user: data.user ? { id: data.user.id, email: data.user.email! } : null,
         session: data.session as Session | null,
@@ -195,27 +234,107 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
     },
 
     async updateProfile(userId, updates) {
-      throwOnError(
-        await supabase.from('users').update(updates).eq('id', userId),
-      );
+      console.log('[API.users.updateProfile] Request', {
+        userId,
+        updateKeys: Object.keys(updates ?? {}),
+        updates,
+      });
+      const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', userId)
+        .select('id, partner_id');
+      if (error) {
+        console.log('[API.users.updateProfile] Supabase error', {
+          userId,
+          message: error.message,
+        });
+        throw new Error(error.message);
+      }
+
+      if (!data || data.length === 0) {
+        const authUserResult = await supabase.auth.getUser();
+        const authUserId = authUserResult.data.user?.id ?? null;
+        const userEmail = authUserResult.data.user?.email ?? null;
+
+        console.log('[API.users.updateProfile] No rows updated by id, trying email fallback', {
+          userId,
+          authUserId,
+          userEmail,
+        });
+
+        // Never fallback to email when caller targets a different user id.
+        // That would update the wrong row and hide the real issue.
+        if (!authUserId || authUserId !== userId) {
+          throw new Error(
+            'Profile update matched 0 rows for the target user id. Fallback by email is only allowed for the currently authenticated user.',
+          );
+        }
+
+        if (!userEmail) {
+          throw new Error(
+            'Profile update matched 0 rows by id and no auth email was available for fallback.',
+          );
+        }
+
+        const emailFallback = await supabase
+          .from('users')
+          .update(updates)
+          .eq('email', userEmail)
+          .select('id, email, partner_id');
+
+        console.log('[API.users.updateProfile] Email fallback result', {
+          data: emailFallback.data,
+          error: emailFallback.error,
+        });
+
+        if (emailFallback.error) {
+          throw new Error(emailFallback.error.message);
+        }
+
+        if (!emailFallback.data || emailFallback.data.length === 0) {
+          throw new Error(
+            'Profile update matched 0 rows by id and by email. Verify users row exists in this Supabase project.',
+          );
+        }
+
+        console.log('[API.users.updateProfile] Success via email fallback', {
+          updatedRow: emailFallback.data[0],
+        });
+        return;
+      }
+
+      console.log('[API.users.updateProfile] Success', {
+        userId,
+        updatedRow: data[0],
+      });
+    },
+  async updateUserPartnerId(inviteCode, data) {
+      await supabase.from('users').update(data).eq('id', inviteCode);
+    },
+
+    async linkByInvite(inviteCode) {
+      await callEdgeFunction('ascension-api', {
+        action: 'users.linkByInvite',
+        payload: {
+          invite_code: inviteCode,
+        },
+      });
     },
 
     async getPartnerData(userId) {
-      // Get the user's partner_id first
-      const { data: user } = await supabase
-        .from('users')
-        .select('partner_id')
-        .eq('id', userId)
-        .single();
+      // In ally flows, monitored user rows store partner_id = ally user id.
+      // So we locate the monitored user by matching partner_id to the ally id.
+      if (!userId) return null;
 
-      if (!user?.partner_id) return null;
-
-      // Fetch partner profile (RLS allows partner reads)
-      const { data: partner } = await supabase
+      // Fetch partner profile (RLS allows partner reads)      
+      const { data: partner, error: partnerError } = await supabase
         .from('users')
         .select('id, name, email, subscription_status')
-        .eq('id', user.partner_id)
+        .eq('partner_id', userId)
         .single();
+
+      if (partnerError) throw new Error(partnerError.message);
 
       if (!partner) return null;
 
@@ -223,8 +342,25 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
       const { data: streak } = await supabase
         .from('streaks')
         .select('*')
-        .eq('user_id', user.partner_id)
+        .eq('user_id', partner.id)
         .single();
+
+      // Compute current_streak from timestamps — do not trust the stored column.
+      let normalizedStreak: Streak | null = normalizeStreak(streak ? (streak as Streak) : null);
+
+      // If the stored longest_streak is still behind the computed value,
+      // persist the correction via the edge function (admin key bypasses RLS).
+      if (normalizedStreak && streak && streak.longest_streak < normalizedStreak.current_streak) {
+        try {
+          const fixed = await callEdgeFunction<Streak>('ascension-api', {
+            action: 'streaks.syncLongest',
+            payload: { user_id: partner.id },
+          });
+          normalizedStreak = normalizeStreak(fixed);
+        } catch {
+          // Edge function not available — keep the already-normalized in-memory value.
+        }
+      }
 
       // Fetch recent alerts for this partner
       const { data: recentAlerts } = await supabase
@@ -239,7 +375,7 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
         name: partner.name,
         email: partner.email,
         subscription_status: partner.subscription_status as SubscriptionStatus,
-        streak: (streak as Streak) ?? null,
+        streak: normalizedStreak,
         recentAlerts: (recentAlerts as Alert[]) ?? [],
       };
     },
@@ -287,6 +423,26 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
       return (data ?? []) as Screenshot[];
     },
 
+    async getRecentByPartner(partnerId, limit = 20) {
+      const { data, error } = await supabase
+        .from('screenshots')
+        .select('*')
+        .eq('partner_id', partnerId)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Screenshot[];
+    },
+
+    async getSignedUrl(filePath) {
+      // Bucket is public — construct the direct public URL.
+      // filePath is stored as "screenshots/{userId}/{timestamp}.jpg"
+      // which is already the full path including the bucket name.
+      if (!filePath) return null;
+      if (filePath.startsWith('http')) return filePath;
+      return `${config.supabaseUrl}/storage/v1/object/public/${filePath}`;
+    },
+
     async getStats(userId) {
       const [totalResult, flaggedCountResult, lastCaptureResult] = await Promise.all([
         supabase
@@ -322,6 +478,21 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
       await callEdgeFunction('ascension-api', {
         action: 'alerts.create',
         payload: data,
+      });
+    },
+
+    async invitePartner(partnerEmail, userName, inviteCode) {
+      await callEdgeFunction('ascension-api', {
+        action: 'alerts.sendEmail',
+        payload: {
+          type: 'partner_invitation',
+          to: partnerEmail,
+          userName,
+          data: {
+            signupUrl: 'https://getascension.app/signup',
+            inviteCode ,
+          },
+        },
       });
     },
 
@@ -366,7 +537,45 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
         if (error.code === 'PGRST116') return null;
         throw new Error(error.message);
       }
-      return data as Streak;
+
+      // Compute current_streak from timestamps — do not trust the stored column.
+      const normalized = normalizeStreak(data as Streak);
+      if (!normalized) return null;
+
+      const stored = data as Streak;
+      const currentStreakChanged = normalized.current_streak !== stored.current_streak;
+      const longestStreakChanged = normalized.longest_streak > stored.longest_streak;
+
+      // Persist the computed values back to the DB when they differ from what
+      // is stored, so the column stays accurate for any other consumers.
+      if (currentStreakChanged || longestStreakChanged) {
+        const { data: fixed, error: fixErr } = await supabase
+          .from('streaks')
+          .update({
+            current_streak: normalized.current_streak,
+            longest_streak: normalized.longest_streak,
+          })
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+
+        if (!fixErr && fixed) return normalizeStreak(fixed as Streak);
+        // If the update failed, return the in-memory normalized value so the
+        // display is still correct even if the write didn't land.
+      }
+
+      return normalized;
+    },
+
+    async syncLongest(userId, currentStreak, longestStreak) {
+      return callEdgeFunction<Streak>('ascension-api', {
+        action: 'streaks.syncLongest',
+        payload: {
+          user_id: userId,
+          current_streak: currentStreak,
+          longest_streak: longestStreak,
+        },
+      });
     },
 
     async reset(userId) {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ScreenLayout, Input, Button, Card, theme } from '@ascension/ui';
+import { ScreenLayout, Header, Input, Button, theme } from '@ascension/ui';
 import { useApi } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/hooks/useAuth';
 
@@ -58,12 +58,19 @@ export default function OnboardingProfileScreen() {
   };
 
   return (
-    <ScreenLayout title="Set Up Your Profile">
-      <Text style={styles.stepIndicator}>Step 1 of 3</Text>
+    <ScreenLayout>
+      <Header
+        title="Create account"
+      />
+      <View style={styles.textBlock}>
+        <Text style={styles.stepIndicator}>STEP 1 OF 3</Text>
+        <Text style={styles.heading}>About you</Text>
+        <Text style={styles.subheading}>Tell us your name and what you want to achieve.</Text>
+      </View>
 
       <Input
-        label="Your Name"
-        placeholder="What should we call you?"
+        label="Your name"
+        placeholder="First name"
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
@@ -71,7 +78,7 @@ export default function OnboardingProfileScreen() {
       />
 
       <Text style={styles.goalsLabel}>What are your goals?</Text>
-      <Text style={styles.goalsHint}>Select all that apply</Text>
+      <Text style={styles.goalsHint}>Select all that apply.</Text>
 
       <View style={styles.goalsList}>
         {GOALS.map((goal) => {
@@ -81,32 +88,34 @@ export default function OnboardingProfileScreen() {
               key={goal.id}
               onPress={() => toggleGoal(goal.id)}
               activeOpacity={0.7}
+              style={styles.goalItem}
             >
-              <Card
+              <View
                 style={[
-                  styles.goalCard,
-                  isSelected && styles.goalCardSelected,
+                  styles.goalRow,
                 ]}
               >
-                <View style={styles.goalRow}>
-                  <View
-                    style={[
-                      styles.checkbox,
-                      isSelected && styles.checkboxSelected,
-                    ]}
-                  >
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text
-                    style={[
-                      styles.goalText,
-                      isSelected && styles.goalTextSelected,
-                    ]}
-                  >
-                    {goal.label}
-                  </Text>
+                <View
+                  style={[
+                    styles.checkbox,
+                    isSelected && styles.checkboxSelected,
+                  ]}
+                >
+                  {isSelected && (
+                    <View style={styles.checkboxFill}>
+                      <View style={styles.checkmark} />
+                    </View>
+                  )}
                 </View>
-              </Card>
+                <Text
+                  style={[
+                    styles.goalText,
+                    isSelected && styles.goalTextSelected,
+                  ]}
+                >
+                  {goal.label}
+                </Text>
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -115,9 +124,9 @@ export default function OnboardingProfileScreen() {
       {error && <Text style={styles.error}>{error}</Text>}
 
       <Button
-        title={saving ? 'Saving...' : 'Next'}
+        title={saving ? 'Saving...' : 'Continue'}
         onPress={handleNext}
-        disabled={saving}
+        disabled={saving || !name.trim() || selectedGoals.length === 0}
         style={styles.nextButton}
       />
     </ScreenLayout>
@@ -125,20 +134,38 @@ export default function OnboardingProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  textBlock: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 12,
+    alignSelf: 'stretch',
+    marginBottom: theme.spacing.lg,
+  },
   stepIndicator: {
-    fontFamily: theme.fontFamily,
+    fontFamily: 'Nunito',
     fontSize: theme.fontSize.caption,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.muted,
-    marginBottom: theme.spacing.lg,
+    letterSpacing: 1,
+  },
+  heading: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.h1,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.foreground,
+  },
+  subheading: {
+    fontFamily: theme.fontFamily,
+    fontSize: theme.fontSize.bodyLg,
+    color: theme.colors.muted,
   },
   goalsLabel: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.bodyLg,
+    fontSize: 24,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
     marginTop: theme.spacing.base,
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
   },
   goalsHint: {
     fontFamily: theme.fontFamily,
@@ -147,38 +174,47 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.base,
   },
   goalsList: {
-    gap: theme.spacing.sm,
+    gap: 20,
+    alignSelf: 'stretch',
   },
-  goalCard: {
-    borderWidth: 1,
-    borderColor: theme.colors.cardBorder,
-  },
-  goalCardSelected: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accentLight,
+  goalItem: {
+    alignSelf: 'stretch',
   },
   goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: theme.borderRadius.card,
+    width: 24,
+    height: 24,
+    borderRadius: 4,
     borderWidth: 2,
-    borderColor: theme.colors.cardBorder,
+    borderColor: '#223D8C',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: theme.spacing.md,
+    flexShrink: 0,
   },
   checkboxSelected: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accent,
+    borderColor: '#223D8C',
+    borderWidth: 0,
+  },
+  checkboxFill: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: '#223D8C',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   checkmark: {
-    color: theme.colors.onAccent,
-    fontSize: theme.fontSize.caption,
-    fontWeight: theme.fontWeight.bold,
+    width: 6,
+    height: 10,
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: '#FFFFFF',
+    transform: [{ rotate: '45deg' }],
+    marginTop: -1,
   },
   goalText: {
     fontFamily: theme.fontFamily,
@@ -187,7 +223,7 @@ const styles = StyleSheet.create({
   },
   goalTextSelected: {
     fontWeight: theme.fontWeight.medium,
-    color: theme.colors.accent,
+    color: theme.colors.foreground,
   },
   error: {
     fontFamily: theme.fontFamily,

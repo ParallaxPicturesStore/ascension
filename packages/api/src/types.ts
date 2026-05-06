@@ -19,6 +19,10 @@ export interface Session {
 
 // ── Users ─────────────────────────────────────────────────────
 
+export interface NotificationSettings {
+  [key: string]: boolean;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -32,6 +36,7 @@ export interface UserProfile {
   partner_password_hash: string | null;
   app_disabled: boolean | null;
   lapse_reminders_sent: string[] | null;
+  notification_settings: NotificationSettings | null;
   created_at: string;
 }
 
@@ -51,6 +56,7 @@ export interface PartnerData {
 export interface Screenshot {
   id: string;
   user_id: string;
+  partner_id: string | null;
   timestamp: string;
   file_path: string | null;
   rekognition_score: number;
@@ -63,10 +69,12 @@ export interface Screenshot {
 
 export interface ScreenshotLog {
   user_id: string;
+  partner_id?: string | null;
   timestamp: string;
   rekognition_score: number;
   flagged: boolean;
   labels: string[] | null;
+  file_path?: string | null;
 }
 
 export interface ScreenshotStats {
@@ -114,6 +122,7 @@ export interface Streak {
   user_id: string;
   current_streak: number;
   longest_streak: number;
+  streak_started_at: string;
   last_relapse_date: string | null;
   updated_at: string;
 }
@@ -173,9 +182,21 @@ export interface CreateEncouragement {
 
 // ── API Client Config ─────────────────────────────────────────
 
+export interface StorageAdapter {
+  getItem(key: string): Promise<string | null> | string | null;
+  setItem(key: string, value: string): Promise<void> | void;
+  removeItem(key: string): Promise<void> | void;
+}
+
 export interface AscensionApiConfig {
   supabaseUrl: string;
   supabaseAnonKey: string;
   /** Base URL for Edge Functions (defaults to supabaseUrl + '/functions/v1') */
   functionsBaseUrl?: string;
+  /**
+   * Custom storage adapter for persisting the auth session.
+   * Pass an AsyncStorage or SecureStore-backed adapter on React Native
+   * so the session survives app restarts.
+   */
+  storage?: StorageAdapter;
 }

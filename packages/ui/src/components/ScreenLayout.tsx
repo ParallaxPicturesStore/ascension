@@ -42,7 +42,7 @@ export function ScreenLayout({ title, children, scrollable = true, style, refres
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.white,
   },
   scrollContainer: {
     flex: 1,
@@ -57,10 +57,11 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing['3xl'],
   },
   title: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.headingFamily,
     fontSize: theme.fontSize.h1,
     fontWeight: theme.fontWeight.bold,
-    color: theme.colors.foreground,
+    lineHeight: theme.lineHeight.h1,
+    color: theme.colors.textPrimary,
     marginBottom: theme.spacing.lg,
   },
 });
