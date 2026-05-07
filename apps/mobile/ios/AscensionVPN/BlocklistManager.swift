@@ -112,7 +112,6 @@ final class BlocklistManager {
         "porngo.com",
         "pornhd.com",
         "pornhub.com",
-        "pornhub.org",
         "pornmd.com",
         "pornone.com",
         "pornpics.com",
