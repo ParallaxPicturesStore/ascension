@@ -13,6 +13,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     private var lastReportedTimestamp = [String: TimeInterval]()
     private let reportDedupeInterval: TimeInterval = 60
 
+    // Heartbeat: fires every 2 minutes so monitoring.checkPaused knows the VPN is still running,
+    // even when the main app is killed.
+    private var heartbeatTimer: DispatchSourceTimer?
+    private let heartbeatInterval: TimeInterval = 120
+
     // MARK: - Tunnel Lifecycle
 
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
@@ -46,6 +51,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
             os_log("Tunnel settings applied, starting DNS interception", log: self?.log ?? .default, type: .info)
             self?.readPackets()
+            self?.startHeartbeat()
             completionHandler(nil)
         }
     }
@@ -57,6 +63,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             "app.getascension.blocklistUpdated" as CFNotificationName,
             nil
         )
+        heartbeatTimer?.cancel()
+        heartbeatTimer = nil
         os_log("Stopping Ascension DNS filter tunnel (reason: %d)", log: log, type: .info, reason.rawValue)
         completionHandler()
     }
@@ -499,6 +507,60 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let responsePacket = ip + udp
         os_log("forwardDNS: delivering %d-byte response packet to device", log: log, type: .info, responsePacket.count)
         packetFlow.writePackets([responsePacket], withProtocols: [protocolFamily])
+    }
+
+    // MARK: - Heartbeat
+
+    private func startHeartbeat() {
+        heartbeatTimer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: reportQueue)
+        // Fire immediately, then repeat every 2 minutes
+        timer.schedule(deadline: .now(), repeating: heartbeatInterval)
+        timer.setEventHandler { [weak self] in self?.sendHeartbeat() }
+        timer.resume()
+        heartbeatTimer = timer
+        os_log("Heartbeat timer started (interval=%.0fs)", log: log, type: .info, heartbeatInterval)
+    }
+
+    private func sendHeartbeat() {
+        guard let defaults = UserDefaults(suiteName: BlocklistManager.appGroupID),
+              let supabaseUrl = defaults.string(forKey: "supabaseUrl"),
+              let userAccessToken = defaults.string(forKey: "userAccessToken"),
+              let supabaseAnonKey = defaults.string(forKey: "supabaseAnonKey"),
+              let userId = defaults.string(forKey: "userId"),
+              !supabaseUrl.isEmpty, !userAccessToken.isEmpty, !userId.isEmpty
+        else {
+            os_log("Heartbeat skipped — no credentials in App Group", log: log, type: .debug)
+            return
+        }
+
+        let urlString = "\(supabaseUrl)/functions/v1/ascension-api"
+        guard let url = URL(string: urlString) else { return }
+
+        let body: [String: Any] = [
+            "action": "monitoring.heartbeat",
+            "payload": ["user_id": userId, "status": "online", "platform": "ios"],
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(userAccessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.httpBody = bodyData
+        request.timeoutInterval = 15
+
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
+            guard let self = self else { return }
+            if let error = error {
+                os_log("Heartbeat failed: %{public}@", log: self.log, type: .error, error.localizedDescription)
+                return
+            }
+            if let http = response as? HTTPURLResponse {
+                os_log("Heartbeat → HTTP %d", log: self.log, type: .info, http.statusCode)
+            }
+        }.resume()
     }
 
     // MARK: - Partner Alert Reporting
