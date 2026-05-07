@@ -139,15 +139,16 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
         // Blocked domain: return NXDOMAIN ourselves and log — do NOT forward
         if blocklist.isDomainBlocked(domain) {
+            let rootDomain = domain.hasPrefix("www.") ? String(domain.dropFirst(4)) : domain
             let blockTimestamp = Date().timeIntervalSince1970
-            let lastLog = lastReportedTimestamp[domain] ?? 0
+            let lastLog = lastReportedTimestamp[rootDomain] ?? 0
             if blockTimestamp - lastLog >= reportDedupeInterval {
-                lastReportedTimestamp[domain] = blockTimestamp
-                blocklist.logBlockedAttempt(domain: domain, timestamp: blockTimestamp)
-                reportBlockedDomain(domain, timestamp: blockTimestamp)
-                os_log("BLOCKED (logged): %{public}@", log: log, type: .info, domain)
+                lastReportedTimestamp[rootDomain] = blockTimestamp
+                blocklist.logBlockedAttempt(domain: rootDomain, timestamp: blockTimestamp)
+                reportBlockedDomain(rootDomain, timestamp: blockTimestamp)
+                os_log("BLOCKED (logged): %{public}@", log: log, type: .info, rootDomain)
             } else {
-                os_log("BLOCKED (deduped): %{public}@", log: log, type: .debug, domain)
+                os_log("BLOCKED (deduped): %{public}@", log: log, type: .debug, rootDomain)
             }
             if let nxResponse = craftNXDOMAINResponse(originalPacket: packet) {
                 packetFlow.writePackets([nxResponse], withProtocols: [protocolFamily])
@@ -439,13 +440,14 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                         // which also return NXDOMAIN but are not user-browsing activity.
                         let rcode = responsePayload[3] & 0x0F
                         if rcode == 3 && self.isReportableDomain(domain) {
-                            os_log("forwardDNS: DNS NXDOMAIN for %{public}@", log: self.log, type: .info, domain)
+                            let rootDomain = domain.hasPrefix("www.") ? String(domain.dropFirst(4)) : domain
+                            os_log("forwardDNS: DNS NXDOMAIN for %{public}@", log: self.log, type: .info, rootDomain)
                             let ts = Date().timeIntervalSince1970
-                            let lastLog = self.lastReportedTimestamp[domain] ?? 0
+                            let lastLog = self.lastReportedTimestamp[rootDomain] ?? 0
                             if ts - lastLog >= self.reportDedupeInterval {
-                                self.lastReportedTimestamp[domain] = ts
-                                self.blocklist.logBlockedAttempt(domain: domain, timestamp: ts)
-                                self.reportBlockedDomain(domain, timestamp: ts)
+                                self.lastReportedTimestamp[rootDomain] = ts
+                                self.blocklist.logBlockedAttempt(domain: rootDomain, timestamp: ts)
+                                self.reportBlockedDomain(rootDomain, timestamp: ts)
                             }
                         }
                         os_log("forwardDNS: <- 1.1.3.3 %d bytes rcode=%d", log: self.log, type: .debug, responsePayload.count, rcode)
