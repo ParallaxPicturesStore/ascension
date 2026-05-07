@@ -93,6 +93,12 @@ function AuthGate() {
           setMonitoringSetupChecked(true);
           return;
         }
+        // User explicitly chose to skip setup — don't redirect them back.
+        if (value === 'deferred') {
+          setMonitoringSetupDeferred(true);
+          setMonitoringSetupChecked(true);
+          return;
+        }
         // On iOS, if the VPN tunnel is already running (e.g. persisted from a
         // previous session after a reinstall), treat setup as complete so the
         // user lands on the dashboard instead of being sent to system-setup.
@@ -276,24 +282,38 @@ function AuthGate() {
       throw new Error('Missing active session');
     }
 
-    if (!monitoringStarted.current) {
-      await startMonitoring(
-        user.id,
-        config.supabaseUrl,
-        session.access_token,
-        config.supabaseAnonKey,
-      );
-      monitoringStarted.current = true;
-    }
-
+    // Persist flag FIRST so the system-setup screen never reappears on the
+    // next open, even if startMonitoring throws (e.g. VPN permission dialog
+    // causes a native exception on the first run).
     await SecureStore.setItemAsync(monitoringSetupKey(user.id), 'true');
     setMonitoringSetupDone(true);
     setMonitoringSetupDeferred(false);
+
+    if (!monitoringStarted.current) {
+      try {
+        await startMonitoring(
+          user.id,
+          config.supabaseUrl,
+          session.access_token,
+          config.supabaseAnonKey,
+        );
+        monitoringStarted.current = true;
+      } catch (err) {
+        console.warn('[Layout] completeMonitoringSetup: startMonitoring failed, will retry on next session', err);
+        // Don't re-throw — the flag is already saved. The layout effect will
+        // attempt to start monitoring again on the next app session.
+      }
+    }
   }, [session, user]);
 
   const deferMonitoringSetup = useCallback(() => {
     setMonitoringSetupDeferred(true);
-  }, []);
+    // Persist the deferred choice so the redirect doesn't reappear when the
+    // user kills and reopens the app.
+    if (user) {
+      SecureStore.setItemAsync(monitoringSetupKey(user.id), 'deferred').catch(() => {});
+    }
+  }, [user]);
 
   if (loading) {
     return (
