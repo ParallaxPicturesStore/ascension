@@ -55,6 +55,26 @@ class VPNManagerModule: NSObject {
 
     // MARK: - Credential Storage
 
+    /// Push a new blocklist into the shared App Group and signal the running VPN extension to reload it.
+    @objc func updateBlocklist(
+        _ domains: [String],
+        resolver resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let defaults = UserDefaults(suiteName: "group.app.getascension") else {
+            reject("BLOCKLIST_ERROR", "Could not access App Group container", nil)
+            return
+        }
+        defaults.set(domains, forKey: "cloudBlocklist")
+        // Signal the VPN extension (separate process) to reload from UserDefaults immediately.
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            "app.getascension.blocklistUpdated" as CFNotificationName,
+            nil, nil, true
+        )
+        resolve(true)
+    }
+
     /// Write auth credentials into the shared App Group container so the VPN
     /// extension can call Supabase directly when the main app is not running.
     @objc func storeCredentials(

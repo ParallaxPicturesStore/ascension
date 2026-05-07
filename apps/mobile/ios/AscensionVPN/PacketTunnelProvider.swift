@@ -18,6 +18,24 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         os_log("Starting Ascension DNS filter tunnel", log: log, type: .info)
 
+        // Reload cloud blocklist on tunnel start so any update written while the
+        // extension was not running is picked up immediately.
+        blocklist.reloadCloudBlocklist()
+
+        // Listen for the main app signaling a fresh blocklist was written to App Group.
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            Unmanaged.passUnretained(self).toOpaque(),
+            { _, observer, _, _, _ in
+                guard let observer = observer else { return }
+                let provider = Unmanaged<PacketTunnelProvider>.fromOpaque(observer).takeUnretainedValue()
+                provider.blocklist.reloadCloudBlocklist()
+            },
+            "app.getascension.blocklistUpdated" as CFString,
+            nil,
+            .deliverImmediately
+        )
+
         let settings = createTunnelSettings()
         setTunnelNetworkSettings(settings) { [weak self] error in
             if let error = error {
@@ -33,6 +51,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        CFNotificationCenterRemoveObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            Unmanaged.passUnretained(self).toOpaque(),
+            "app.getascension.blocklistUpdated" as CFNotificationName,
+            nil
+        )
         os_log("Stopping Ascension DNS filter tunnel (reason: %d)", log: log, type: .info, reason.rawValue)
         completionHandler()
     }
@@ -112,6 +136,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             if blockTimestamp - lastLog >= reportDedupeInterval {
                 lastReportedTimestamp[domain] = blockTimestamp
                 blocklist.logBlockedAttempt(domain: domain, timestamp: blockTimestamp)
+                reportBlockedDomain(domain, timestamp: blockTimestamp)
                 os_log("BLOCKED (logged): %{public}@", log: log, type: .info, domain)
             } else {
                 os_log("BLOCKED (deduped): %{public}@", log: log, type: .debug, domain)
@@ -399,6 +424,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                             if ts - lastLog >= self.reportDedupeInterval {
                                 self.lastReportedTimestamp[domain] = ts
                                 self.blocklist.logBlockedAttempt(domain: domain, timestamp: ts)
+                                self.reportBlockedDomain(domain, timestamp: ts)
                             }
                         }
                         os_log("forwardDNS: <- 1.1.3.3 %d bytes rcode=%d", log: self.log, type: .debug, responsePayload.count, rcode)

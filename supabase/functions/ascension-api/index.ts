@@ -273,6 +273,27 @@ const EMAIL_TEMPLATES: Record<string, TemplateEntry> = {
       `;
     },
   },
+
+  monitoring_paused: {
+    subject: (name: string) => `${name} - Monitoring has stopped`,
+    html: (name: string, data: Record<string, unknown>) => `
+      <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="font-size: 14px; letter-spacing: 3px; color: #1a3a5c; margin: 0;">ASCENSION</h1>
+        </div>
+        <p style="font-size: 15px; line-height: 1.6; margin-bottom: 16px;">
+          Monitoring on <strong>${name}'s</strong> device has stopped.
+          The last activity was recorded at <strong>${data.time}</strong> on <strong>${data.date}</strong>.
+        </p>
+        <div style="background: #fff7ed; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+          <p style="margin: 0; font-size: 14px; color: #9a3412;">
+            This could mean the VPN was turned off, the app was force-closed, or the device was restarted.
+          </p>
+        </div>
+        <p style="font-size: 14px; color: #6b6560;">You may want to check in with ${name}.</p>
+      </div>
+    `,
+  },
 };
 
 async function sendEmailViaResend(
@@ -314,6 +335,10 @@ async function getCallerUserId(req: Request): Promise<string | null> {
   if (!authHeader) return null;
 
   const token = authHeader.replace("Bearer ", "");
+
+  // Allow the service role key for internal cron jobs (monitoring.checkPaused).
+  if (serviceRoleKey && token === serviceRoleKey) return "service_role";
+
   const { data, error } = await anonDb.auth.getUser(token);
   if (error || !data.user) return null;
   return data.user.id;
@@ -622,20 +647,22 @@ const actions: Record<string, ActionHandler> = {
   },
 
   // ── rekognition.analyze ──
-  "rekognition.analyze": async (payload, _callerId) => {
+  // Analyzes a screenshot with Rekognition. If the score hits the alert threshold,
+  // logs the screenshot, resets streak, creates a partner alert, and emails the partner
+  // — all in this one call so alerts fire even when the mobile JS layer is not running.
+  // 2-minute dedup prevents double alerts when the JS layer also calls reportFlag.
+  "rekognition.analyze": async (payload, callerId) => {
     const { base64Image } = payload as { base64Image: string };
 
     if (!base64Image) return errorResponse("base64Image is required", 400);
 
     const client = getRekognition();
     if (!client) {
-      // No AWS credentials — return clean result (dev mode)
       console.log("[API] No AWS credentials — skipping Rekognition analysis");
       return jsonResponse({ labels: [], maxConfidence: 0, raw: [] });
     }
 
     try {
-      // Decode base64 to Uint8Array
       const binaryStr = atob(base64Image);
       const bytes = new Uint8Array(binaryStr.length);
       for (let i = 0; i < binaryStr.length; i++) {
@@ -650,7 +677,6 @@ const actions: Record<string, ActionHandler> = {
       const response = await client.send(command);
       const labels = response.ModerationLabels ?? [];
 
-      // Filter to only flagged categories
       const relevant = labels.filter((label) =>
         FLAGGED_CATEGORIES.some(
           (cat) =>
@@ -663,21 +689,96 @@ const actions: Record<string, ActionHandler> = {
           ? Math.max(...relevant.map((l) => l.Confidence ?? 0))
           : 0;
 
-      return jsonResponse({
-        labels: relevant.map(
-          (l) => `${l.Name} (${(l.Confidence ?? 0).toFixed(1)}%)`,
-        ),
-        maxConfidence,
-        raw: labels,
-      });
+      const labelStrings = relevant.map(
+        (l) => `${l.Name} (${(l.Confidence ?? 0).toFixed(1)}%)`,
+      );
+
+      const isAlert = maxConfidence >= 90;
+
+      // If alert-level, handle logging + partner notification server-side so it
+      // works even when the app is backgrounded or the JS bridge is not running.
+      if (isAlert && callerId) {
+        // Dedup: skip if an alert was already sent for this user in the last 2 minutes.
+        const windowStart = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        const { data: recent } = await adminDb
+          .from("screenshots")
+          .select("id")
+          .eq("user_id", callerId)
+          .eq("flagged", true)
+          .gte("timestamp", windowStart)
+          .limit(1);
+
+        if (!recent || recent.length === 0) {
+          const now = new Date().toISOString();
+
+          // Log screenshot
+          await adminDb.from("screenshots").insert({
+            user_id: callerId,
+            timestamp: now,
+            rekognition_score: maxConfidence,
+            flagged: true,
+            labels: labelStrings,
+          });
+
+          // Fetch user for partner details
+          const { data: user } = await adminDb
+            .from("users")
+            .select("name, partner_id, partner_email")
+            .eq("id", callerId)
+            .single();
+
+          if (user) {
+            const userName = (user.name as string | null) ?? "User";
+            const partnerId = user.partner_id as string | null;
+            const partnerEmail = user.partner_email as string | null;
+
+            // Reset streak
+            const { data: streak } = await adminDb
+              .from("streaks")
+              .select("current_streak, longest_streak")
+              .eq("user_id", callerId)
+              .maybeSingle();
+            if (streak) {
+              await adminDb.from("streaks").update({
+                current_streak: 0,
+                last_relapse_date: now,
+                longest_streak: Math.max(
+                  (streak.longest_streak as number) ?? 0,
+                  (streak.current_streak as number) ?? 0,
+                ),
+                updated_at: now,
+              }).eq("user_id", callerId);
+            }
+
+            // Create alert record
+            if (partnerId) {
+              await adminDb.from("alerts").insert({
+                user_id: callerId,
+                partner_id: partnerId,
+                type: "content_detected",
+                message: `NSFW content detected (${labelStrings[0] ?? "unknown"}: ${Math.round(maxConfidence)}%)`,
+              });
+            }
+
+            // Email partner
+            if (partnerEmail) {
+              const template = EMAIL_TEMPLATES["content_detected"];
+              if (template) {
+                const html = template.html(userName, {
+                  confidence: Math.round(maxConfidence).toString(),
+                  labels: labelStrings.join(", "),
+                });
+                await sendEmailViaResend(partnerEmail, template.subject(userName), html);
+              }
+            }
+          }
+        }
+      }
+
+      return jsonResponse({ labels: labelStrings, maxConfidence, raw: labels });
     } catch (err) {
       console.error("[API] Rekognition error:", (err as Error).message);
-      return jsonResponse({
-        labels: [],
-        maxConfidence: 0,
-        raw: [],
-        error: (err as Error).message,
-      });
+      return jsonResponse({ labels: [], maxConfidence: 0, raw: [], error: (err as Error).message });
     }
   },
 
@@ -790,6 +891,20 @@ const actions: Record<string, ActionHandler> = {
     if (!user_id || !domain) return errorResponse("user_id and domain are required", 400);
     if (user_id !== callerId) return errorResponse("Cannot log blocks for another user", 403);
 
+    // Dedup: if this domain was already logged for this user in the last 5 minutes, skip.
+    const windowStart = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: recent } = await adminDb
+      .from("blocked_attempts")
+      .select("id")
+      .eq("user_id", user_id)
+      .eq("url", domain)
+      .gte("timestamp", windowStart)
+      .limit(1);
+
+    if (recent && recent.length > 0) {
+      return jsonResponse({ success: true, duplicate: true });
+    }
+
     const { data: user, error: userErr } = await adminDb
       .from("users")
       .select("name, partner_id, partner_email")
@@ -890,6 +1005,73 @@ const actions: Record<string, ActionHandler> = {
     }
 
     return jsonResponse({ success: true });
+  },
+
+  // ── monitoring.checkPaused ──
+  // Called by pg_cron every 5 minutes with the service role key.
+  // Sends ONE alert per pause event to partners of users whose heartbeat has
+  // gone stale. Re-alerts only after monitoring resumes and stops again
+  // (last_heartbeat > monitoring_paused_alerted_at).
+  // Only runs for users with an active or unexpired trial subscription.
+  "monitoring.checkPaused": async (_payload, callerId) => {
+    if (callerId !== "service_role") return errorResponse("Forbidden", 403);
+
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const { data: candidates, error } = await adminDb
+      .from("users")
+      .select("id, name, partner_email, last_heartbeat, monitoring_paused_alerted_at, subscription_status, subscription_lapse_date")
+      .not("last_heartbeat", "is", null)
+      .lt("last_heartbeat", cutoff)
+      .not("partner_email", "is", null)
+      .in("subscription_status", ["active", "trial"]);
+
+    if (error) return errorResponse(error.message, 500);
+    if (!candidates || candidates.length === 0) return jsonResponse({ success: true, alerted: 0 });
+
+    const toAlert = candidates.filter((u: Record<string, unknown>) => {
+      // Trial users whose lapse date has passed are no longer active subscribers.
+      if (u.subscription_status === "trial") {
+        const lapseDate = u.subscription_lapse_date as string | null;
+        if (lapseDate && lapseDate <= nowIso) return false;
+      }
+
+      // Only alert if: never alerted before, OR monitoring came back online after
+      // the last alert (last_heartbeat > monitoring_paused_alerted_at) and went silent again.
+      if (!u.monitoring_paused_alerted_at) return true;
+      return (u.last_heartbeat as string) > (u.monitoring_paused_alerted_at as string);
+    });
+
+    let alerted = 0;
+    for (const user of toAlert) {
+      const lastHeartbeat = new Date(user.last_heartbeat as string);
+      const template = EMAIL_TEMPLATES["monitoring_paused"];
+      if (!template || !user.partner_email) continue;
+
+      const userName = (user.name as string | null) ?? "User";
+      const html = template.html(userName, {
+        time: lastHeartbeat.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+        date: lastHeartbeat.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+      });
+
+      const result = await sendEmailViaResend(
+        user.partner_email as string,
+        template.subject(userName),
+        html,
+      );
+
+      if (result.success) {
+        await adminDb
+          .from("users")
+          .update({ monitoring_paused_alerted_at: nowIso })
+          .eq("id", user.id);
+        alerted++;
+      }
+    }
+
+    return jsonResponse({ success: true, alerted });
   },
 
   // ── watchdog.heartbeat ──

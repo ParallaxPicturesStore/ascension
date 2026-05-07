@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, View, Text, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, View, Text, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { config } from '../src/config';
 import { startMonitoring, stopMonitoring, onDetection } from '../src/services/MonitoringService';
 import type { AnalysisResult } from '../src/services/ContentAnalyzer';
 import { isSubscriptionExpired } from '../src/utils/subscription';
+import { vpnManager } from '../src/native/VPNManager';
 
 // SecureStore-backed storage adapter so Supabase sessions persist across restarts
 const secureStoreAdapter: StorageAdapter = {
@@ -85,10 +86,33 @@ function AuthGate() {
 
     setMonitoringSetupChecked(false);
     SecureStore.getItemAsync(monitoringSetupKey(user.id))
-      .then((value) => {
+      .then(async (value) => {
         if (cancelled) return;
-        setMonitoringSetupDone(value === 'true');
-        setMonitoringSetupChecked(true);
+        if (value === 'true') {
+          setMonitoringSetupDone(true);
+          setMonitoringSetupChecked(true);
+          return;
+        }
+        // On iOS, if the VPN tunnel is already running (e.g. persisted from a
+        // previous session after a reinstall), treat setup as complete so the
+        // user lands on the dashboard instead of being sent to system-setup.
+        if (Platform.OS === 'ios' && vpnManager.isAvailable) {
+          try {
+            const status = await vpnManager.getVPNStatus();
+            if (status === 'connected') {
+              await SecureStore.setItemAsync(monitoringSetupKey(user.id), 'true');
+              if (!cancelled) {
+                setMonitoringSetupDone(true);
+                setMonitoringSetupChecked(true);
+                return;
+              }
+            }
+          } catch { /* fall through */ }
+        }
+        if (!cancelled) {
+          setMonitoringSetupDone(false);
+          setMonitoringSetupChecked(true);
+        }
       })
       .catch(() => {
         if (cancelled) return;

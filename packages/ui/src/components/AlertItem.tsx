@@ -25,7 +25,7 @@ export const AlertItem = React.memo(function AlertItem({ type, message, timestam
 
   return (
     <View style={[styles.container, !read && styles.unread, style]}>
-      <Text style={styles.icon}>{icon}</Text>
+<WarningIcon/>
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={[styles.type]}>{label}</Text>

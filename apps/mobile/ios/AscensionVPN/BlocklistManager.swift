@@ -112,6 +112,7 @@ final class BlocklistManager {
         "porngo.com",
         "pornhd.com",
         "pornhub.com",
+        "pornhub.org",
         "pornmd.com",
         "pornone.com",
         "pornpics.com",
@@ -162,6 +163,7 @@ final class BlocklistManager {
         "xvideos.com",
         "xxxbunker.com",
         "youjizz.com",
+        "you-porn.com",
         "youporn.com",
         "zbporn.com",
     ]

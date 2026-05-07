@@ -31,7 +31,7 @@ import {
   type AnalysisResult,
 } from './ContentAnalyzer';
 import { vpnManager } from '../native/VPNManager';
-import { sendHeartbeat, reportFlag, reportVPNBlock } from './AntiTamper';
+import { sendHeartbeat, reportVPNBlock } from './AntiTamper';
 import { fetchBlocklist } from './BlocklistService';
 
 // ---------------------------------------------------------------------------
@@ -316,23 +316,11 @@ async function handleScreenshot(event: ScreenshotEvent): Promise<void> {
       );
       state.flagsRaised++;
 
-      // Notify in-app subscribers (e.g. for UI alert modals)
+      // Notify in-app subscribers (e.g. for UI alert modals).
+      // Server-side logging, streak reset, and partner alert are handled inside
+      // rekognition.analyze on the Supabase edge function — no duplicate call needed.
       detectionCallbacks.forEach((cb) => {
         try { cb(result); } catch { /* ignore callback errors */ }
-      });
-
-      // Report to the server and alert partner if alert-level
-      await reportFlag({
-        userId: _userId,
-        userAccessToken: _userAccessToken,
-        supabaseUrl: _supabaseUrl,
-        supabaseAnonKey: _supabaseAnonKey,
-        base64: event.base64,
-        timestamp: event.timestamp,
-        labels: result.labels.length > 0 ? result.labels : [result.topCategory],
-        topCategory: result.topCategory,
-        topScore: result.topScore,
-        isAlert: result.alert,
       });
     } else {
       console.log(
