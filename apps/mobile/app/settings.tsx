@@ -305,7 +305,7 @@ export default function SettingsScreen() {
           {(subscriptionStatus === 'active' || subscriptionStatus === 'cancelled' || subscriptionStatus === 'expired') && (
             <Button
               title={managingSubscription ? 'Opening...' : 'Manage Subscription'}
-              variant="secondary"
+              variant="primary"
               onPress={handleManageSubscription}
               disabled={managingSubscription}
               style={styles.planButton}
