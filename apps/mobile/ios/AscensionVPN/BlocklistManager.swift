@@ -162,7 +162,6 @@ final class BlocklistManager {
         "xvideos.com",
         "xxxbunker.com",
         "youjizz.com",
-        "you-porn.com",
         "youporn.com",
         "zbporn.com",
     ]

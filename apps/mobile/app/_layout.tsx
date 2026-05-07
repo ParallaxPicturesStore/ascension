@@ -88,7 +88,27 @@ function AuthGate() {
     SecureStore.getItemAsync(monitoringSetupKey(user.id))
       .then(async (value) => {
         if (cancelled) return;
-        if (value === 'true') {
+       
+        // On iOS, if the VPN tunnel is already running (e.g. persisted from a
+        // previous session after a reinstall), treat setup as complete so the
+        // user lands on the dashboard instead of being sent to system-setup.
+
+        if (Platform.OS === 'ios' && vpnManager.isAvailable) {
+          try {
+            const status = await vpnManager.getVPNStatus();
+            if (status === 'connected') {
+              // VPN is on — mark setup done (handles reinstall case too) and go to dashboard
+              await SecureStore.setItemAsync(monitoringSetupKey(user.id), 'true');
+              if (!cancelled) { setMonitoringSetupDone(true); setMonitoringSetupChecked(true); }
+              return;
+            } else {
+              // VPN is off or paused — always send to system-setup regardless of saved flag
+              if (!cancelled) { setMonitoringSetupDone(false); setMonitoringSetupChecked(true); }
+              return;
+            }
+          } catch { /* fall through to flag-based check */ }
+        }
+         if (value === 'true') {
           setMonitoringSetupDone(true);
           setMonitoringSetupChecked(true);
           return;
@@ -99,24 +119,10 @@ function AuthGate() {
           setMonitoringSetupChecked(true);
           return;
         }
-        // On iOS, if the VPN tunnel is already running (e.g. persisted from a
-        // previous session after a reinstall), treat setup as complete so the
-        // user lands on the dashboard instead of being sent to system-setup.
-        if (Platform.OS === 'ios' && vpnManager.isAvailable) {
-          try {
-            const status = await vpnManager.getVPNStatus();
-            if (status === 'connected') {
-              await SecureStore.setItemAsync(monitoringSetupKey(user.id), 'true');
-              if (!cancelled) {
-                setMonitoringSetupDone(true);
-                setMonitoringSetupChecked(true);
-                return;
-              }
-            }
-          } catch { /* fall through */ }
-        }
+
+        // Android (or iOS VPN check failed): rely on the saved SecureStore flag
         if (!cancelled) {
-          setMonitoringSetupDone(false);
+          setMonitoringSetupDone(value === 'true');
           setMonitoringSetupChecked(true);
         }
       })

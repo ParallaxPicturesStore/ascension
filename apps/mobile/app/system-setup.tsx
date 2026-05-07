@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Card, Header, ScreenLayout, theme } from '@ascension/ui';
 import LockIcon from '../assets/icons/lock.svg';
@@ -31,7 +31,7 @@ export default function SystemSetupScreen() {
       await completeMonitoringSetup();
       setReady(true);
     } catch {
-      setActivationError('Could not enable monitoring. Please try again.');
+      setActivationError(Platform.OS === 'ios' ? 'Could not enable VPN. Please try again.' : 'Could not enable monitoring. Please try again.');
     } finally {
       setActivating(false);
     }
@@ -78,7 +78,7 @@ export default function SystemSetupScreen() {
   }
 
   return (
-    <ScreenLayout scrollable={false}>
+    <ScreenLayout scrollable>
       <View style={styles.container}>
         <Header title="System setup" showBack onBack={() => router.back()} />
 
@@ -87,27 +87,38 @@ export default function SystemSetupScreen() {
           To protect you, Ascension needs access to your device activity.
         </Text>
 
-        <Card style={styles.stepsCard}>
-          <Text style={styles.stepsTitle}>Steps list</Text>
-          {Platform.OS === 'ios' ? (
-            <>
-              <Text style={styles.stepText}>1. Tap Enable monitoring below.</Text>
-              <Text style={styles.stepText}>2. Allow the VPN configuration when prompted.</Text>
-              <Text style={styles.stepText}>3. That's it — all adult sites will be blocked.</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.stepText}>1. Enable screen recording.</Text>
-              <Text style={styles.stepText}>2. Allow accessibility access.</Text>
-              <Text style={styles.stepText}>3. Allow notifications.</Text>
-            </>
-          )}
-        </Card>
+        {Platform.OS === 'ios' ? (
+          <>
+            <Card style={styles.stepsCard}>
+              <Text style={styles.stepsTitle}>Steps list</Text>
+              <Text style={styles.stepText}>1. Allow VPN configuration.</Text>
+              <Text style={styles.stepText}>2. Keep VPN on at all times.</Text>
+              <Text style={styles.stepText}>3. Restrict adult websites via Screen Time.</Text>
+              <Text style={styles.stepText}>4. Enable Ascension Safari extension.</Text>
+              <Text style={styles.stepText}>   • Open Settings</Text>
+              <Text style={styles.stepText}>   • Tap Safari → Extensions</Text>
+              <Text style={styles.stepText}>   • Find Ascension and toggle it on</Text>
+              <Text style={styles.stepText}>   • Tap Allow for all websites</Text>
+              <Pressable onPress={() => Linking.openURL('App-Prefs:SAFARI')}>
+                <Text style={styles.stepLink}>Open Safari Settings →</Text>
+              </Pressable>
+            </Card>
+          </>
+        ) : (
+          <Card style={styles.stepsCard}>
+            <Text style={styles.stepsTitle}>Steps list</Text>
+            <Text style={styles.stepText}>1. Enable screen recording.</Text>
+            <Text style={styles.stepText}>2. Allow accessibility access.</Text>
+            <Text style={styles.stepText}>3. Allow notifications.</Text>
+          </Card>
+        )}
 
         {activationError && <Text style={styles.errorText}>{activationError}</Text>}
 
         <Button
-          title={activating ? 'Enabling monitoring...' : 'Enable monitoring'}
+          title={Platform.OS === 'ios'
+            ? (activating ? 'Enabling VPN...' : 'Enable VPN')
+            : (activating ? 'Enabling monitoring...' : 'Enable monitoring')}
           onPress={handleEnableMonitoring}
           disabled={activating}
           leftSlot={<LockIcon width={15} height={20} />}
@@ -224,5 +235,95 @@ const styles = StyleSheet.create({
   },
   successButton: {
     width: '100%',
+  },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.base,
+    paddingBottom: theme.spacing.base,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#d8dce8',
+  },
+  stepLast: {
+    marginBottom: 0,
+    paddingBottom: 0,
+    borderBottomWidth: 0,
+  },
+  stepBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.base,
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  stepNumber: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: 14,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.onAccent,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepHeading: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.foreground,
+    marginBottom: 4,
+  },
+  stepDesc: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.muted,
+    lineHeight: 22,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stepLink: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.accent,
+    fontWeight: theme.fontWeight.semiBold,
+  },
+  safariGuide: {
+    marginTop: theme.spacing.base,
+    backgroundColor: theme.colors.accentLight,
+    borderRadius: 12,
+    padding: theme.spacing.base,
+  },
+  safariGuideTitle: {
+    fontFamily: theme.typography.headingFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.foreground,
+    marginBottom: theme.spacing.sm,
+  },
+  safariGuideStep: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.textSecondary,
+    lineHeight: 26,
+  },
+  safariGuideEm: {
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.foreground,
+  },
+  safariGuideButton: {
+    marginTop: theme.spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  safariGuideButtonText: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    fontWeight: theme.fontWeight.semiBold,
+    color: theme.colors.accent,
   },
 });

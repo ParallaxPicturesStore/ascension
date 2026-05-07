@@ -275,19 +275,19 @@ const EMAIL_TEMPLATES: Record<string, TemplateEntry> = {
   },
 
   monitoring_paused: {
-    subject: (name: string) => `${name} - Monitoring has stopped`,
+    subject: (name: string) => `${name} - Content blocking may be inactive`,
     html: (name: string, data: Record<string, unknown>) => `
       <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
         <div style="text-align: center; margin-bottom: 32px;">
           <h1 style="font-size: 14px; letter-spacing: 3px; color: #1a3a5c; margin: 0;">ASCENSION</h1>
         </div>
         <p style="font-size: 15px; line-height: 1.6; margin-bottom: 16px;">
-          Monitoring on <strong>${name}'s</strong> device has stopped.
+          Content blocking on <strong>${name}'s</strong> device appears to have stopped.
           The last activity was recorded at <strong>${data.time}</strong> on <strong>${data.date}</strong>.
         </p>
         <div style="background: #fff7ed; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
           <p style="margin: 0; font-size: 14px; color: #9a3412;">
-            This could mean the VPN was turned off, the app was force-closed, or the device was restarted.
+            Adult content may no longer be blocked on their device.
           </p>
         </div>
         <p style="font-size: 14px; color: #6b6560;">You may want to check in with ${name}.</p>

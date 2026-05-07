@@ -60,7 +60,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         CFNotificationCenterRemoveObserver(
             CFNotificationCenterGetDarwinNotifyCenter(),
             Unmanaged.passUnretained(self).toOpaque(),
-            "app.getascension.blocklistUpdated" as CFNotificationName,
+            CFNotificationName("app.getascension.blocklistUpdated" as CFString),
             nil
         )
         heartbeatTimer?.cancel()
@@ -160,6 +160,17 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     // MARK: - DNS Parsing
+
+    /// Returns false for system/internal DNS queries that should never be reported:
+    /// reverse DNS (*.arpa), mDNS (*.local), service discovery (_prefix), single labels.
+    private func isReportableDomain(_ domain: String) -> Bool {
+        if domain.hasSuffix(".arpa") { return false }
+        if domain.hasSuffix(".local") { return false }
+        if domain.hasPrefix("_") { return false }
+        let labels = domain.split(separator: ".")
+        if labels.count < 2 { return false }
+        return true
+    }
 
     // Known DoH server IPs — drop TCP/443 traffic to these to force plain DNS
     private let dohServerIPs: Set<String> = [
@@ -423,9 +434,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                             os_log("forwardDNS: receive error: %{public}@", log: self.log, type: .error, error?.localizedDescription ?? "empty")
                             return
                         }
-                        // Detect NXDOMAIN (RCODE=3) — Cloudflare blocked this domain
+                        // Detect NXDOMAIN (RCODE=3) — Cloudflare blocked this domain.
+                        // Skip system/internal queries (reverse DNS, mDNS, service discovery)
+                        // which also return NXDOMAIN but are not user-browsing activity.
                         let rcode = responsePayload[3] & 0x0F
-                        if rcode == 3 {
+                        if rcode == 3 && self.isReportableDomain(domain) {
                             os_log("forwardDNS: DNS NXDOMAIN for %{public}@", log: self.log, type: .info, domain)
                             let ts = Date().timeIntervalSince1970
                             let lastLog = self.lastReportedTimestamp[domain] ?? 0
