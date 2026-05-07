@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View, Text, Alert, ActivityIndicator, Linking, Pressable, TextInput, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, Text, Alert, ActivityIndicator, Linking, Pressable, TextInput, useWindowDimensions, Keyboard, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +41,7 @@ export default function SettingsScreen() {
   const [savingPartner, setSavingPartner] = useState(false);
 
   const [managingSubscription, setManagingSubscription] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -69,6 +70,19 @@ export default function SettingsScreen() {
       .catch(() => {})
       .finally(() => { clearTimeout(timer); setLoading(false); });
   }, [api, user]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handleSaveName = async () => {
     if (!user || !nameValue.trim()) return;
@@ -222,7 +236,7 @@ export default function SettingsScreen() {
                     title={savingName ? 'Saving...' : 'Save'}
                     onPress={handleSaveName}
                     disabled={savingName}
-                    style={styles.editActionButton}
+                    style={[styles.editActionButton, styles.saveButtonNoShadow]}
                   />
                 </View>
               </View>
@@ -331,52 +345,54 @@ export default function SettingsScreen() {
       </View>
     </ScreenLayout>
 
-      <View
-        style={[
-          styles.bottomNav,
-          {
-            width: navWidth,
-            marginLeft: -navWidth / 2,
-            bottom: navBottomOffset,
-          },
-        ]}
-      >
-        <Pressable
-          onPress={() => router.push('/')}
-          style={styles.navItem}
-          accessibilityRole="button"
-          accessibilityLabel="Go to dashboard"
+      {!keyboardVisible && (
+        <View
+          style={[
+            styles.bottomNav,
+            {
+              width: navWidth,
+              marginLeft: -navWidth / 2,
+              bottom: navBottomOffset,
+            },
+          ]}
         >
-          <Ionicons name="home-outline" size={23} color="#11131A" />
-        </Pressable>
+          <Pressable
+            onPress={() => router.push('/')}
+            style={styles.navItem}
+            accessibilityRole="button"
+            accessibilityLabel="Go to dashboard"
+          >
+            <Ionicons name="home-outline" size={23} color="#11131A" />
+          </Pressable>
 
-        <Pressable
-          onPress={() => showUnavailableTab('Connect')}
-          style={styles.navItem}
-          accessibilityRole="button"
-          accessibilityLabel="Connect tab coming soon"
-        >
-          <Ionicons name="search-outline" size={27} color="#11131A" />
-        </Pressable>
+          <Pressable
+            onPress={() => showUnavailableTab('Connect')}
+            style={styles.navItem}
+            accessibilityRole="button"
+            accessibilityLabel="Connect tab coming soon"
+          >
+            <Ionicons name="search-outline" size={27} color="#11131A" />
+          </Pressable>
 
-        <Pressable
-          onPress={() => showUnavailableTab('Alerts')}
-          style={styles.navItem}
-          accessibilityRole="button"
-          accessibilityLabel="Alerts tab coming soon"
-        >
-          <Ionicons name="notifications-outline" size={25} color="#11131A" />
-        </Pressable>
+          <Pressable
+            onPress={() => showUnavailableTab('Alerts')}
+            style={styles.navItem}
+            accessibilityRole="button"
+            accessibilityLabel="Alerts tab coming soon"
+          >
+            <Ionicons name="notifications-outline" size={25} color="#11131A" />
+          </Pressable>
 
-        <Pressable
-          onPress={() => router.push('/settings')}
-          style={[styles.navItem, styles.navItemActive]}
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-        >
-          <Ionicons name="settings-outline" size={25} color="#FFFFFF" />
-        </Pressable>
-      </View>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            style={[styles.navItem, styles.navItemActive]}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+          >
+            <Ionicons name="settings-outline" size={25} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -447,6 +463,13 @@ const styles = StyleSheet.create({
     minWidth: 96,
     minHeight: 42,
     borderRadius: 132,
+  },
+  saveButtonNoShadow: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   editButton: {
     paddingVertical: theme.spacing.xs,
