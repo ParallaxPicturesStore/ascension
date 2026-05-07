@@ -64,7 +64,7 @@ export interface AscensionAPI {
   readonly supabase: SupabaseClient;
 
   auth: {
-    signUp(email: string, password: string): Promise<AuthResult>;
+    signUp(email: string, password: string, redirectTo?: string): Promise<AuthResult>;
     signIn(email: string, password: string): Promise<AuthResult>;
     signOut(): Promise<void>;
     getSession(): Promise<Session | null>;
@@ -177,8 +177,12 @@ export function createApiClient(config: AscensionApiConfig): AscensionAPI {
   // ── Auth ────────────────────────────────────────────────────
 
   const auth: AscensionAPI['auth'] = {
-    async signUp(email, password) {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+    async signUp(email, password, redirectTo?: string) {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+      });
       if (error) return { user: null, session: null, error: error.message };
       // Supabase returns an empty identities array instead of an error when the email is already registered
       if (data.user && (!data.user.identities || data.user.identities.length === 0)) {

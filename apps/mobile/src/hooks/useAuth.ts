@@ -52,8 +52,8 @@ export function useAuth() {
   );
 
   const signUp = useCallback(
-    async (email: string, password: string) => {
-      const result = await api.auth.signUp(email, password);
+    async (email: string, password: string, redirectTo?: string) => {
+      const result = await api.auth.signUp(email, password, redirectTo);
       return result;
     },
     [api],

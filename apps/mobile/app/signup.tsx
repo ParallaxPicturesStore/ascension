@@ -41,7 +41,7 @@ export default function SignupScreen() {
     setLoading(true);
 
     try {
-      const result = await signUp(trimmedEmail, password);
+      const result = await signUp(trimmedEmail, password, 'ascension://login');
       if (result.error) {
         setError(result.error);
       } else {
