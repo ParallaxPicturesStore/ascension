@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, View, Text, RefreshControl, ActivityIndicator, Platform, Linking, Alert as RNAlert, useWindowDimensions, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -23,6 +24,10 @@ import BlockedSiteThisWeekIcon from '../assets/icons/blocked_site_this_week.svg'
 import BlockedSiteIcon from '../assets/icons/blocked_site.svg';
 import FlaggedIcon from '../assets/icons/flagged.svg';
 
+function partnerReminderShownKey(userId: string): string {
+  return `partner_reminder_shown_${userId}`;
+}
+
 export default function DashboardScreen() {
   const api = useApi();
   const { user } = useAuth();
@@ -40,6 +45,35 @@ export default function DashboardScreen() {
   const [vpnStatus, setVpnStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'error'>('disconnected');
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [subscriptionBlockReason, setSubscriptionBlockReason] = useState<'expired' | 'cancelled' | 'trial_expired' | null>(null);
+  const partnerReminderShownRef = useRef(false);
+
+  const maybeShowPartnerReminder = useCallback(async (partnerEmail: string | null | undefined) => {
+    if (!user || partnerEmail || partnerReminderShownRef.current) return;
+
+    try {
+      const reminderKey = partnerReminderShownKey(user.id);
+      const alreadyShown = await SecureStore.getItemAsync(reminderKey);
+      if (alreadyShown === 'true') {
+        partnerReminderShownRef.current = true;
+        return;
+      }
+
+      partnerReminderShownRef.current = true;
+      await SecureStore.setItemAsync(reminderKey, 'true');
+
+      RNAlert.alert(
+        'Add Your Partner',
+        'You have not added an accountability partner yet. Add one from Settings.',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => router.push('/settings') },
+        ],
+      );
+    } catch {
+      // If secure storage fails, avoid repeat prompts during this app session.
+      partnerReminderShownRef.current = true;
+    }
+  }, [router, user]);
 
   const loadData = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -71,12 +105,14 @@ export default function DashboardScreen() {
       setAlerts(alertsData.slice(0, 5));
       setStats(statsData);
       setWeeklyStats(weeklyData);
+
+      await maybeShowPartnerReminder(profile.partner_email);
     } catch {
       setError('Unable to load your data. Pull down to try again.');
     } finally {
       setLoading(false);
     }
-  }, [api, user]);
+  }, [api, maybeShowPartnerReminder, user]);
 
   useEffect(() => {
     if (!subscriptionExpired) return;
