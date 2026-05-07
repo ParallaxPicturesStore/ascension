@@ -18,6 +18,7 @@ import { stopMonitoring } from '../src/services/MonitoringService';
 import { isSubscriptionExpired } from '../src/utils/subscription';
 import { SubscriptionSuspendedView } from '../src/components/SubscriptionSuspendedView';
 import SubscriptionAlertIcon from '../assets/icons/subscription_alert.svg';
+import AlertBoxIcon from '../assets/icons/alert_box.svg';
 import BlockedSiteThisWeekIcon from '../assets/icons/blocked_site_this_week.svg';
 import BlockedSiteIcon from '../assets/icons/blocked_site.svg';
 import FlaggedIcon from '../assets/icons/flagged.svg';
@@ -237,18 +238,20 @@ export default function DashboardScreen() {
           <Text style={styles.weeklySubtitle}>Activity overview for the past 7 days.</Text>
         </View>
 
-        <Card style={styles.primaryMetricCard}>
+        <View style={styles.primaryMetricCard}>
           <View style={styles.bigMetricRow}>
             <View style={styles.metricCopy}>
               <Text style={styles.bigMetricNumber}>{blockedThisWeek}</Text>
               <Text style={styles.bigMetricLabel}>Blocked this week</Text>
             </View>
+            <View style={styles.primaryMetricIconWrap}>
             <BlockedSiteThisWeekIcon
               width={isCompact ? 108 : 134}
               height={isCompact ? 84 : 104}
             />
+            </View>
           </View>
-        </Card>
+        </View>
 
         <View style={[styles.secondaryMetricsRow, isCompact && styles.secondaryMetricsColumn]}>
           <View style={styles.secondaryMetricCard}>
@@ -282,7 +285,7 @@ export default function DashboardScreen() {
 
         {alerts.length === 0 && (
           <View style={styles.emptyAlertsWrap}>
-            <SubscriptionAlertIcon width={118} height={86} />
+            <AlertBoxIcon width={118} height={86} />
             <Text style={styles.emptyAlertsTitle}>No alerts yet</Text>
             <Text style={styles.emptyAlertsSubtitle}>No alerts - keep it up!</Text>
           </View>
@@ -393,10 +396,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: theme.fontSize.h2,
     fontWeight: theme.fontWeight.medium,
-    color: theme.colors.textPrimary,
+    color: theme.colors.black,
   },
   statusRightWrap: {
     flexDirection: 'row',
@@ -475,24 +477,27 @@ const styles = StyleSheet.create({
   },
   weeklyTitle: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.fontSize.h3,
-    lineHeight: 28,
+    fontSize: theme.fontSize.header,
     fontWeight: theme.fontWeight.medium,
-    color: theme.colors.textPrimary,
+    color: theme.colors.black,
   },
   weeklySubtitle: {
     marginTop: theme.spacing.sm,
     fontFamily: theme.typography.bodyFamily,
     fontWeight: theme.fontWeight.regular,
     fontSize: theme.fontSize.body,
-    color: '#5C616C',
+    color: theme.colors.inputSecondaryText,
   },
   primaryMetricCard: {
     marginBottom: theme.spacing.md,
+    borderRadius: theme.borderRadius.card,
+    paddingVertical: theme.spacing.base,
+    paddingHorizontal: theme.spacing.md,
     backgroundColor: '#F7F9FF',
     borderColor: 'transparent',
     shadowOpacity: 0,
     elevation: 0,
+    overflow: 'hidden',
   },
   bigMetricRow: {
     flexDirection: 'row',
@@ -512,11 +517,15 @@ const styles = StyleSheet.create({
   bigMetricLabel: {
     marginTop: theme.spacing.sm,
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.fontSize.body,
-    lineHeight: 22,
+    fontSize: theme.fontSize.bodyLg,
     fontWeight: theme.fontWeight.regular,
     color: theme.colors.textPrimary,
   },
+  primaryMetricIconWrap : {
+      position: 'absolute', 
+      right: -theme.spacing.base,
+      bottom: -theme.spacing.base,
+  }, 
   secondaryMetricsRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
@@ -567,7 +576,7 @@ const styles = StyleSheet.create({
   },
   alertsSectionTitle: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.fontSize.h2,
+    fontSize: theme.fontSize.header,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.textPrimary,
   },
@@ -588,9 +597,9 @@ const styles = StyleSheet.create({
   emptyAlertsSubtitle: {
     marginTop: theme.spacing.sm,
     fontFamily: theme.typography.bodyFamily,
-    fontSize: 16,
-    lineHeight: 22,
-    color: '#555861',
+    fontSize: theme.fontSize.bodyLg,
+    lineHeight: theme.lineHeight.body,
+    color: theme.colors.inputSecondaryText,
   },
   alertCard: {
     marginBottom: theme.spacing.sm,

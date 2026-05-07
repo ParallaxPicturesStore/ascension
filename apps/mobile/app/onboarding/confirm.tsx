@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ScreenLayout, Button, Card, Header, theme } from '@ascension/ui';
+import { ScreenLayout, Button, Header, theme } from '@ascension/ui';
 import type { UserProfile } from '@ascension/api';
 import { useApi } from '../../src/hooks/useApi';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -64,7 +64,7 @@ export default function OnboardingConfirmScreen() {
       </Text>
 
       {/* Profile summary */}
-      <Card style={styles.summaryCard}>
+      <View style={styles.summaryCard}>
         <View style={styles.row}>
           <Text style={styles.label}>Your name</Text>
           <Text style={styles.value}>{profile?.name ?? 'Not set'}</Text>
@@ -83,7 +83,7 @@ export default function OnboardingConfirmScreen() {
           <Text style={styles.label}>Partner's email</Text>
           <Text style={styles.value}>{profile?.partner_email ?? 'Not invited yet'}</Text>
         </View>
-      </Card>
+      </View>
 
       <Button
         title="Confirm"
@@ -101,25 +101,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stepIndicator: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.caption,
     fontWeight: theme.fontWeight.regular,
-    color: theme.colors.muted,
+    color: theme.colors.inputSecondaryText,
     letterSpacing: 0.5,
     marginBottom: theme.spacing.lg,
   },
   heading: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.h1,
-    fontWeight: theme.fontWeight.bold,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.cardText,
+    letterSpacing: 0.5,
+    fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
     marginBottom: theme.spacing.md,
   },
   subtitle: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
-    lineHeight: 22,
+    color: theme.colors.inputSecondaryText,
+    lineHeight: theme.lineHeight.body,
     marginBottom: theme.spacing.lg,
   },
   summaryCard: {
@@ -127,6 +128,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: theme.colors.cardBorder,
+    padding: theme.spacing.base,
   },
   row: {
     flexDirection: 'row',
@@ -141,17 +143,17 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.xs,
   },
   label: {
-    fontFamily: theme.fontFamily,
+    fontFamily: theme.typography.bodyFamily,
     fontSize: theme.fontSize.body,
-    color: theme.colors.muted,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.inputSecondaryText,
   },
   value: {
-    fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.body,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.foreground,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.black,
     textAlign: 'right',
-    flexShrink: 1,
   },
   confirmButton: {
     marginTop: theme.spacing.md,

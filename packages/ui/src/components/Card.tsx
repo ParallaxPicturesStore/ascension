@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.card,
     borderWidth: 1,
     borderColor: theme.colors.cardBorder,
-    ...theme.shadow.subtle,
+    // ...theme.shadow.subtle,
   },
   header: {
     paddingHorizontal: theme.spacing.base,

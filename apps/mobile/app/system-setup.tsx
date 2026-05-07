@@ -88,7 +88,7 @@ export default function SystemSetupScreen() {
         </Text>
 
         <Card style={styles.stepsCard}>
-          <Text style={styles.stepsTitle}>What happens next</Text>
+          <Text style={styles.stepsTitle}>Steps list</Text>
           {Platform.OS === 'ios' ? (
             <>
               <Text style={styles.stepText}>1. Tap Enable monitoring below.</Text>
@@ -162,9 +162,9 @@ const styles = StyleSheet.create({
   },
   stepsTitle: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: theme.fontSize.h2,
+    fontSize: theme.fontSize.h3,
     fontWeight: theme.fontWeight.semiBold,
-    color: theme.colors.foreground,
+    color: theme.colors.black,
     marginBottom: theme.spacing.base,
   },
   stepText: {
@@ -212,8 +212,8 @@ const styles = StyleSheet.create({
   successHeading: {
     fontFamily: theme.typography.headingFamily,
     fontSize: theme.fontSize.h1,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.foreground,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.black,
     marginBottom: theme.spacing.sm,
   },
   successSubheading: {

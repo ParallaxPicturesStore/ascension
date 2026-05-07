@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   heading: {
     fontFamily: theme.fontFamily,
     fontSize: theme.fontSize.h1,
-    fontWeight: theme.fontWeight.semiBold,
+    fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
   },
   subheading: {
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   },
   goalsLabel: {
     fontFamily: theme.fontFamily,
-    fontSize: 24,
+    fontSize: theme.fontSize.header,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
     marginTop: theme.spacing.base,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   },
   goalText: {
     fontFamily: theme.fontFamily,
-    fontSize: theme.fontSize.body,
+    fontSize: theme.fontSize.bodyLg,
     color: theme.colors.foreground,
   },
   goalTextSelected: {

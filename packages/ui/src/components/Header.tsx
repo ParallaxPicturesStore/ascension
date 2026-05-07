@@ -64,11 +64,11 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontFamily: theme.fontFamily,
-    fontSize: 18,
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.bodyLg,
     fontWeight: theme.fontWeight.medium,
-    lineHeight: 22,
-    color: '#000000',
+    lineHeight: theme.lineHeight.bodyLg,
+    color: theme.colors.cardText,
     textAlign: 'center',
   },
   titleSpacer: {

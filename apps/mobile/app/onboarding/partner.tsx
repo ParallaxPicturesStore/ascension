@@ -184,17 +184,17 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: 30,
-    fontWeight: theme.fontWeight.semiBold,
-    lineHeight: 36,
+    fontSize: theme.fontSize.h1,
+    lineHeight: theme.lineHeight.h1,
+    fontWeight: theme.fontWeight.medium,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.base,
   },
   subheading: {
     fontFamily: theme.typography.bodyFamily,
-    fontSize: theme.fontSize.h3,
-    lineHeight: 38,
-    color: '#5E5E67',
+    fontSize: theme.fontSize.bodyLg,
+    fontWeight: theme.fontWeight.regular,
+    color: theme.colors.textSecondary,   
   },
   input: {
     marginBottom: theme.spacing.lg,
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     fontFamily: theme.typography.headingFamily,
-    fontSize: 24,
+    fontSize: theme.fontSize.h3,
     fontWeight: theme.fontWeight.semiBold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
