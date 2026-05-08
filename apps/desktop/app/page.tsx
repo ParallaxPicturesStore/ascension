@@ -37,8 +37,8 @@ export default function Dashboard() {
     }[]
   >([]);
   const [weeklyStats, setWeeklyStats] = useState({
-    screenshotCount: 0,
-    blockedCount: 0,
+    blockedThisWeekCount: 0,
+    blockedTotalCount: 0,
     flaggedCount: 0,
   });
   const effectiveSubscriptionStatus = getEffectiveSubscriptionStatus(
@@ -170,8 +170,15 @@ export default function Dashboard() {
 
     // Get weekly stats via IPC
     if (typeof window !== "undefined" && window.ascension) {
-      const stats = await window.ascension.getWeeklyStats(session.user.id);
-      if (stats) setWeeklyStats(stats);
+      const stats = await window.ascension.getWeeklyStats(session.user.id) as any;
+      console.log("[Dashboard] Weekly stats received:", stats);
+      if (stats) {
+        setWeeklyStats({
+          blockedThisWeekCount: stats.blockedThisWeekCount ?? 0,
+          blockedTotalCount: stats.blockedTotalCount ?? 0,
+          flaggedCount: stats.flaggedCount ?? 0,
+        });
+      }
     }
 
     setLoading(false);
@@ -579,7 +586,7 @@ export default function Dashboard() {
                         lineHeight: 1,
                         fontFamily: 'var(--font-auth)'
                       }}>
-                        {weeklyStats.screenshotCount}
+                        {weeklyStats.blockedThisWeekCount ?? 0}
                       </div>
                       <div style={{ 
                         fontSize: '18px',
@@ -625,7 +632,7 @@ export default function Dashboard() {
                         lineHeight: 1,
                         fontFamily: 'var(--font-auth)'
                       }}>
-                        {weeklyStats.blockedCount}
+                        {weeklyStats.blockedTotalCount ?? 0}
                       </div>
                       <div style={{ 
                         fontSize: '18px',

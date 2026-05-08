@@ -102,22 +102,32 @@ function registerIpcHandlers(mainWindow, onUserLoggedIn, doAuthorizedQuit) {
     supabaseUrl,
     supabaseAnonKey,
   }) => {
+    console.log("[IPC] Partner invite request:", { partnerEmail, userName, hasToken: !!accessToken });
+    
     if (typeof partnerEmail !== "string" || typeof userName !== "string") {
+      console.error("[IPC] Invalid invitation parameters");
       return { error: "Invalid invitation parameters" };
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) {
+      console.error("[IPC] Invalid email address:", partnerEmail);
       return { error: "Invalid email address" };
     }
     if (typeof supabaseUrl === "string" && supabaseUrl.length > 0) {
       setSupabaseConfig(supabaseUrl, typeof supabaseAnonKey === "string" ? supabaseAnonKey : "");
+      console.log("[IPC] Supabase config set");
     }
     if (typeof accessToken === "string" && accessToken.length > 0) {
       setAccessToken(accessToken);
+      console.log("[IPC] Access token set");
     }
-    return await sendAlertEmail("partner_invitation", partnerEmail, userName, {
+    
+    const result = await sendAlertEmail("partner_invitation", partnerEmail, userName, {
       signupUrl: "https://getascension.app/signup",
       inviteCode: typeof inviterUserId === "string" ? inviterUserId : "",
     });
+    
+    console.log("[IPC] Partner invite result:", result);
+    return result;
   });
 
   // Streak

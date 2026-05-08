@@ -55,6 +55,15 @@ let currentUserId = null;
 let allowQuit = false;
 const isDev = !app.isPackaged;
 
+// Register custom protocol for deep linking (ascension://)
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('ascension', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('ascension');
+}
+
 if (process.env.ASCENSION_ENABLE_GPU !== "1") {
   app.disableHardwareAcceleration();
   crashLog(`Hardware acceleration disabled on ${process.platform}`);
@@ -192,12 +201,25 @@ function createWindow() {
   });
 
   // SECURITY: Prevent new window creation (e.g. window.open)
+  // Allow internal navigation, open external links in browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     const { shell } = require("electron");
     try {
       const parsed = new URL(url);
+      // Check if it's an internal link (localhost or 127.0.0.1)
+      const isInternal = 
+        parsed.hostname === "localhost" || 
+        parsed.hostname === "127.0.0.1";
+      
       if (parsed.protocol === "https:" || parsed.protocol === "http:") {
-        shell.openExternal(url);
+        if (isInternal) {
+          // Navigate within the app instead of opening new window
+          mainWindow.loadURL(url);
+          return { action: "deny" };
+        } else {
+          // Open external links in default browser
+          shell.openExternal(url);
+        }
       }
     } catch (_) {}
     return { action: "deny" };
@@ -374,5 +396,50 @@ app.on("before-quit", (e) => {
     confirmQuit("force quit");
   }
 });
+
+// Handle deep links (ascension://...)
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  crashLog("Deep link opened: " + url);
+  
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    
+    // Extract the path from the deep link
+    // Example: ascension://auth/callback?token=... -> /auth/callback?token=...
+    const urlObj = new URL(url);
+    const path = urlObj.pathname + urlObj.search + urlObj.hash;
+    
+    // Navigate to the path in the app
+    const baseUrl = isDev ? "http://localhost:3001" : getProductionUrl();
+    mainWindow.loadURL(baseUrl + path);
+  }
+});
+
+// Handle deep links on Windows (second-instance)
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, focus our window instead
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      
+      // Check if there's a deep link in the command line
+      const url = commandLine.find((arg) => arg.startsWith('ascension://'));
+      if (url) {
+        crashLog("Deep link from second instance: " + url);
+        const urlObj = new URL(url);
+        const path = urlObj.pathname + urlObj.search + urlObj.hash;
+        const baseUrl = isDev ? "http://localhost:3001" : getProductionUrl();
+        mainWindow.loadURL(baseUrl + path);
+      }
+    }
+  });
+}
 
 module.exports = { getMainWindow: () => mainWindow, onUserLoggedIn };

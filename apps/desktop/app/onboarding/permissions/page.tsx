@@ -20,9 +20,9 @@ export default function PermissionsPage() {
   async function handleEnable() {
     setLoading(true);
     try {
-      if (typeof window !== "undefined" && window.ascension?.requestPermissions) {
-        await window.ascension.requestPermissions();
-      }
+      // TODO: Implement requestPermissions in preload.js for screen recording, accessibility, and notifications
+      // For now, this just completes the onboarding flow
+      console.log("[Permissions] Permission request would be triggered here");
     } catch (err) {
       console.error("[Permissions] Failed to request permissions:", err);
     }

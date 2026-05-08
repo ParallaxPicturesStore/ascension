@@ -307,7 +307,7 @@ export default function PricingPage() {
               loading={loading}
               onClick={handleStartTrial}
             >
-              Start free trial
+              Choose Plan
             </Button>
 
             {/* Skip — stays on trial without Stripe */}

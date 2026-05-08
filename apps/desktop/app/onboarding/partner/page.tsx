@@ -14,8 +14,8 @@ const PARTNER_VISIBILITY = [
   { icon: "/icons/chart.svg",   text: "Your current streak and progress" },
   { icon: "/icons/warning.svg", text: "Alerts when concerning content is detected" },
   { icon: "/icons/blocked.svg", text: "Blocked access attempts" },
-  { icon: "/icons/shield.svg",  text: "They will NOT see screenshots or specific URLs" },
-  { icon: "/icons/lock.svg",    text: "They will NOT see your browsing history" },
+  { icon: "/icons/lock.svg",  text: "They will NOT see screenshots or specific URLs" },
+  { icon: "/icon-shield.svg",    text: "They will NOT see your browsing history" },
 ];
 
 export default function OnboardingPartner() {
@@ -52,16 +52,24 @@ export default function OnboardingPartner() {
 
     // Send invite email (non-blocking)
     try {
-      if (normalised && typeof window !== "undefined" && window.ascension?.invitePartner) {
-        const { data: profile } = await supabase
-          .from("users")
-          .select("name")
-          .eq("id", session.user.id)
-          .single();
+      const { data: profile } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", session.user.id)
+        .single();
 
-        await window.ascension.invitePartner(
+      const userName = profile?.name || "Your partner";
+
+      console.log("[Onboarding] Sending partner invite to:", normalised);
+      console.log("[Onboarding] User name:", userName);
+      console.log("[Onboarding] Has window.ascension:", !!window.ascension);
+      
+      // Try Electron IPC first
+      if (typeof window !== "undefined" && window.ascension?.invitePartner) {
+        console.log("[Onboarding] Using Electron IPC");
+        const result = await window.ascension.invitePartner(
           normalised,
-          profile?.name || "Your partner",
+          userName,
           {
             inviterUserId: session.user.id,
             accessToken: session.access_token,
@@ -69,6 +77,35 @@ export default function OnboardingPartner() {
             supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
           }
         );
+        
+        console.log("[Onboarding] Invite result:", result);
+        
+        if (result && typeof result === 'object' && 'error' in result) {
+          console.error("[Onboarding] Invite failed:", result.error);
+        }
+      } else {
+        // Fallback: Call Edge Function directly
+        console.log("[Onboarding] Fallback: calling Edge Function directly");
+        const { error: emailError } = await supabase.functions.invoke("ascension-api", {
+          body: {
+            action: "alerts.sendEmail",
+            payload: {
+              type: "partner_invitation",
+              to: normalised,
+              userName: userName,
+              data: {
+                signupUrl: "https://getascension.app/signup",
+                inviteCode: session.user.id,
+              }
+            }
+          }
+        });
+        
+        if (emailError) {
+          console.error("[Onboarding] Email send failed:", emailError);
+        } else {
+          console.log("[Onboarding] Email sent successfully via Edge Function");
+        }
       }
     } catch (err) {
       console.error("[Onboarding] Failed to send partner invite:", err);

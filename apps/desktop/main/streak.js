@@ -105,22 +105,21 @@ async function updateAllStreaks() {
 
 async function getWeeklyStats(userId) {
   const db = getAuthDb() || getDb();
-  if (!db) return { screenshotCount: 0, blockedCount: 0, flaggedCount: 0 };
+  if (!db) return { blockedThisWeekCount: 0, blockedTotalCount: 0, flaggedCount: 0 };
 
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
-  const [screenshots, blocked, alerts] = await Promise.all([
+  const [blockedThisWeek, blockedTotal, flagged] = await Promise.all([
     db
-      .from("screenshots")
+      .from("blocked_attempts")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("timestamp", weekAgo.toISOString()),
     db
       .from("blocked_attempts")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("timestamp", weekAgo.toISOString()),
+      .eq("user_id", userId),
     db
       .from("screenshots")
       .select("id", { count: "exact", head: true })
@@ -129,18 +128,18 @@ async function getWeeklyStats(userId) {
       .gte("timestamp", weekAgo.toISOString()),
   ]);
 
-  if (screenshots.error || blocked.error || alerts.error) {
+  if (blockedThisWeek.error || blockedTotal.error || flagged.error) {
     console.error("[Streak] Error fetching weekly stats:", {
-      screenshots: screenshots.error?.message,
-      blocked: blocked.error?.message,
-      alerts: alerts.error?.message,
+      blockedThisWeek: blockedThisWeek.error?.message,
+      blockedTotal: blockedTotal.error?.message,
+      flagged: flagged.error?.message,
     });
   }
 
   return {
-    screenshotCount: screenshots.count || 0,
-    blockedCount: blocked.count || 0,
-    flaggedCount: alerts.count || 0,
+    blockedThisWeekCount: blockedThisWeek.count || 0,
+    blockedTotalCount: blockedTotal.count || 0,
+    flaggedCount: flagged.count || 0,
   };
 }
 

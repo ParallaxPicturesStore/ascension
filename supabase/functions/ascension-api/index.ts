@@ -339,7 +339,11 @@ const ALLOWED_ORIGINS = new Set([
 
 function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") ?? "";
-  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "";
+  
+  // Allow localhost and 127.0.0.1 on any port for Electron app
+  const isLocalhost = origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) || isLocalhost ? origin : "";
+  
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

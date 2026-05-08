@@ -3,7 +3,25 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// For Electron, we need to detect the local server URL dynamically
+// In development: http://localhost:3001
+// In production: http://127.0.0.1:<random-port>
+const getRedirectUrl = () => {
+  if (typeof window !== "undefined") {
+    // Use the current window location as the base
+    return `${window.location.origin}/auth/callback`;
+  }
+  return "http://localhost:3001/auth/callback";
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    flowType: 'pkce',
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    persistSession: true,
+  }
+});
 
 type AscensionFunctionResponse = {
 	success?: boolean;
