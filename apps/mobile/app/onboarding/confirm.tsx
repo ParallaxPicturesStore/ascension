@@ -74,7 +74,7 @@ export default function OnboardingConfirmScreen() {
 
         <View style={styles.row}>
           <Text style={styles.label}>Your goals</Text>
-          <Text style={styles.value}>{goalsValue}</Text>
+          <Text style={styles.value} numberOfLines={2}>{goalsValue}</Text>
         </View>
 
         <View style={styles.divider} />
@@ -129,13 +129,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.cardBorder,
     padding: theme.spacing.base,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: theme.spacing.sm,
     gap: theme.spacing.md,
+    flexWrap: 'wrap',
   },
   divider: {
     height: 1,
@@ -154,6 +156,9 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.regular,
     color: theme.colors.black,
     textAlign: 'right',
+    flex: 1,
+    flexWrap: 'wrap',
+    maxWidth: '60%',
   },
   confirmButton: {
     marginTop: theme.spacing.md,

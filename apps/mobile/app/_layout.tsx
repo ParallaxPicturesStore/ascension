@@ -405,18 +405,18 @@ export default function RootLayout() {
   useEffect(() => {
     clearKeychainOnFreshInstall().finally(() => setReady(true));
 
-    // iOS: refresh cloud blocklist into App Group on every launch so the
-    // VPN extension always has the latest list even after a TestFlight reinstall.
+    // iOS: warm the VPN manager cache and refresh cloud blocklist on every launch.
+    // getVPNStatus caches tunnelManager so updateBlocklist can send the provider
+    // message without an extra async round-trip when the fetch resolves.
     if (Platform.OS === 'ios') {
-      try {
-        fetchBlocklist()
-          .then((domains) => {
-            if (domains.length > 0) {
-              vpnManager.updateBlocklist(domains).catch(() => {});
-            }
-          })
-          .catch(() => {});
-      } catch {}
+      vpnManager.getVPNStatus().catch(() => {});
+      fetchBlocklist()
+        .then((domains) => {
+          if (domains.length > 0) {
+            vpnManager.updateBlocklist(domains).catch(() => {});
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
