@@ -90,7 +90,7 @@ class VPNManagerModule: NSObject {
         // Signal the VPN extension (separate process) to reload from UserDefaults immediately.
         CFNotificationCenterPostNotification(
             CFNotificationCenterGetDarwinNotifyCenter(),
-            "app.getascension.blocklistUpdated" as CFNotificationName,
+            CFNotificationName("app.getascension.blocklistUpdated" as CFString),
             nil, nil, true
         )
         resolve(true)
