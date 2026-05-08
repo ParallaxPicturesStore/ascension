@@ -205,7 +205,7 @@ export default function HomeScreen() {
               Alerts
             </Text>
             <View style={styles.actionMeta}>
-              <Text style={styles.actionCount}>{unreadAlertCount > 0 ? `${unreadAlertCount}` : ''}</Text>
+              <Text style={styles.actionCount}>{unreadAlertCount > 0 ? `${unreadAlertCount}` : 0}</Text>
               <Text style={styles.actionType}>active</Text>
             </View>
           </TouchableOpacity>
