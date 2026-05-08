@@ -16,6 +16,7 @@ import { startMonitoring, stopMonitoring, onDetection } from '../src/services/Mo
 import type { AnalysisResult } from '../src/services/ContentAnalyzer';
 import { isSubscriptionExpired } from '../src/utils/subscription';
 import { vpnManager } from '../src/native/VPNManager';
+import { fetchBlocklist } from '../src/services/BlocklistService';
 
 // SecureStore-backed storage adapter so Supabase sessions persist across restarts
 const secureStoreAdapter: StorageAdapter = {
@@ -403,6 +404,20 @@ export default function RootLayout() {
 
   useEffect(() => {
     clearKeychainOnFreshInstall().finally(() => setReady(true));
+
+    // iOS: refresh cloud blocklist into App Group on every launch so the
+    // VPN extension always has the latest list even after a TestFlight reinstall.
+    if (Platform.OS === 'ios') {
+      try {
+        fetchBlocklist()
+          .then((domains) => {
+            if (domains.length > 0) {
+              vpnManager.updateBlocklist(domains).catch(() => {});
+            }
+          })
+          .catch(() => {});
+      } catch {}
+    }
   }, []);
 
   const api = useMemo(

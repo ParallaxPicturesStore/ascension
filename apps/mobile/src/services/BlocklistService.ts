@@ -1,15 +1,12 @@
-const BLOCKLIST_URL = 'https://flrllorqzmbztvtccvab.supabase.co/storage/v1/object/public/blocked%20url/blocklist.txt';
+const BLOCKLIST_URL = 'https://flrllorqzmbztvtccvab.supabase.co/functions/v1/quick-processor';
 
 export async function fetchBlocklist(): Promise<string[]> {
   try {
     const res = await fetch(BLOCKLIST_URL, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const text = await res.text();
-    const domains = text
-      .split('\n')
-      .map((l) => l.trim().toLowerCase())
-      .filter((l) => l.length > 0 && !l.startsWith('#'));
+    const json = await res.json() as { domains: string[] };
+    const domains = json.domains ?? [];
 
     console.log(`[Blocklist] fetched ${domains.length} domains`);
     return domains;

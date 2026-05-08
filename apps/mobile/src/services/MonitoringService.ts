@@ -125,7 +125,7 @@ export async function startMonitoring(
   _platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
   // Fetch blocklist from Supabase Storage (cached 24h), used by both platforms
-  const blocklist = await fetchBlocklist().catch(() => []);
+  // const blocklist = await fetchBlocklist().catch(() => []);
 
   // iOS only: start the VPN DNS filter tunnel + begin syncing blocked attempts
   if (Platform.OS === 'ios') {
@@ -137,9 +137,6 @@ export async function startMonitoring(
       console.log(`[MonitoringService] VPN tunnel ${started ? 'started' : 'already running or denied'}`);
 
       // Push the cloud blocklist into App Group so the VPN extension picks it up
-      if (blocklist.length > 0) {
-        await vpnManager.updateBlocklist(blocklist).catch(() => {});
-      }
 
       // Seed the cursor so we only report blocks that happen after this start
       const existing = await vpnManager.getRecentBlocked();
