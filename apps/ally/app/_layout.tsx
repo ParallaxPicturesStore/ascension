@@ -26,13 +26,16 @@ export function useApi(): AscensionAPI {
   return api;
 }
 
+const PartnerRefreshContext = createContext<() => Promise<void>>(async () => {});
+export function usePartnerRefresh() { return useContext(PartnerRefreshContext); }
+
 /**
  * Inner layout that handles auth-based routing.
  * Redirects to /login if no session, /connect if no partner linked.
  */
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, loading: authLoading } = useAuth();
-  const { partner, loading: partnerLoading } = usePartner(session?.user?.id);
+  const { partner, loading: partnerLoading, refresh } = usePartner(session?.user?.id);
   const segments = useSegments();
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -71,7 +74,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <PartnerRefreshContext.Provider value={refresh}>
+      {children}
+    </PartnerRefreshContext.Provider>
+  );
 }
 
 export default function RootLayout() {

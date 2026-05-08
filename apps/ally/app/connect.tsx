@@ -3,11 +3,13 @@ import { StyleSheet, View, Text } from 'react-native';
 import { theme, ScreenLayout, Input, Button, Card, BackButton } from '@ascension/ui';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '@/hooks/useAuth';
+import { usePartnerRefresh } from './_layout';
 import { useRouter } from 'expo-router';
 
 export default function ConnectScreen() {
   const api = useApi();
   const { session } = useAuth();
+  const refreshPartner = usePartnerRefresh();
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,6 +27,7 @@ export default function ConnectScreen() {
       await api.users.updateUserPartnerId(inviteCode.trim(), {
         partner_id: session.user.id,
       });
+      await refreshPartner();
       router.replace('/');
     } catch (err) {
       setError(
