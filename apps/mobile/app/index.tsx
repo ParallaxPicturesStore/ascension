@@ -14,8 +14,9 @@ import type { Alert, Streak, ScreenshotStats, WeeklyStats } from '@ascension/api
 import { ALERT_TYPE_LABELS, formatRelativeTime, getAlertSeverity, type AlertType } from '@ascension/shared';
 import { useApi } from '../src/hooks/useApi';
 import { useAuth } from '../src/hooks/useAuth';
+import { config } from '../src/config';
 import { vpnManager } from '../src/native/VPNManager';
-import { stopMonitoring } from '../src/services/MonitoringService';
+import { stopMonitoring, startMonitoring, getMonitoringState } from '../src/services/MonitoringService';
 import { isSubscriptionExpired } from '../src/utils/subscription';
 import { SubscriptionSuspendedView } from '../src/components/SubscriptionSuspendedView';
 import SubscriptionAlertIcon from '../assets/icons/subscription_alert.svg';
@@ -30,7 +31,7 @@ function partnerReminderShownKey(userId: string): string {
 
 export default function DashboardScreen() {
   const api = useApi();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -125,12 +126,20 @@ export default function DashboardScreen() {
     loadData();
   }, [loadData]);
 
-  // Poll VPN status on iOS every 5 seconds while screen is mounted
+  const [androidMonitoringActive, setAndroidMonitoringActive] = useState(true);
+
+  // Poll VPN/monitoring status every 5 seconds while screen is mounted
   useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    vpnManager.getVPNStatus().then(setVpnStatus);
-    const t = setInterval(() => vpnManager.getVPNStatus().then(setVpnStatus), 5000);
-    return () => clearInterval(t);
+    if (Platform.OS === 'ios') {
+      vpnManager.getVPNStatus().then(setVpnStatus);
+      const t = setInterval(() => vpnManager.getVPNStatus().then(setVpnStatus), 5000);
+      return () => clearInterval(t);
+    } else {
+      const check = () => setAndroidMonitoringActive(getMonitoringState().status !== 'inactive');
+      check();
+      const t = setInterval(check, 5000);
+      return () => clearInterval(t);
+    }
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -160,7 +169,7 @@ export default function DashboardScreen() {
 
   const monitoringActive = Platform.OS === 'ios'
     ? vpnStatus === 'connected'
-    : true; // Android monitoring managed by MonitoringService
+    : androidMonitoringActive;
 
   const isCompact = width < 380;
   const navWidth = Math.min(360, Math.max(304, width - 32));
@@ -256,6 +265,27 @@ export default function DashboardScreen() {
             </Text>
           </View>
         </View>
+
+        {!monitoringActive && (
+          <View style={styles.monitoringWarning}>
+            <Text style={styles.monitoringWarningTitle}>Monitoring inactive</Text>
+            <Text style={styles.monitoringWarningText}>
+              Content monitoring is not running on this device.
+            </Text>
+            <Button
+              title="Start monitoring"
+              onPress={async () => {
+                if (!user || !session) return;
+                try {
+                  await startMonitoring(user.id, config.supabaseUrl, session.access_token, config.supabaseAnonKey);
+                  setAndroidMonitoringActive(true);
+                } catch {
+                  RNAlert.alert('Error', 'Could not start monitoring. Please try again.');
+                }
+              }}
+            />
+          </View>
+        )}
 
         <View style={styles.streakCard}>
           <View style={styles.streakRow}>
@@ -458,6 +488,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: theme.fontWeight.regular,
     color: theme.colors.textPrimary,
+  },
+  monitoringWarning: {
+    backgroundColor: theme.colors.backgroundCard,
+    borderRadius: theme.borderRadius.card,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.warning,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  monitoringWarningTitle: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.header,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.warning,
+  },
+  monitoringWarningText: {
+    fontFamily: theme.typography.bodyFamily,
+    fontSize: theme.fontSize.body,
+    color: theme.colors.muted,
+    marginBottom: theme.spacing.xs,
   },
   streakCard: {
     marginBottom: theme.spacing.xl,

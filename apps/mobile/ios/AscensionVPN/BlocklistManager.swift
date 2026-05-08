@@ -205,8 +205,9 @@ final class BlocklistManager {
 
     /// Reload cloud blocklist from App Group after the main app writes a new one.
     func reloadCloudBlocklist() {
-        let domains = UserDefaults(suiteName: BlocklistManager.appGroupID)?
-            .stringArray(forKey: "cloudBlocklist") ?? []
+        guard let defaults = UserDefaults(suiteName: BlocklistManager.appGroupID) else { return }
+        defaults.synchronize() // Force read from shared container file, not stale in-process cache
+        let domains = defaults.stringArray(forKey: "cloudBlocklist") ?? []
         cloudBlocklist = Set(domains.map { $0.lowercased() })
     }
 

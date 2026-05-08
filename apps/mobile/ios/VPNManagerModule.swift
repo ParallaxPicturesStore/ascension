@@ -87,11 +87,18 @@ class VPNManagerModule: NSObject {
             return
         }
         defaults.set(domains, forKey: "cloudBlocklist")
-        // Tell the running tunnel to reload immediately via sendProviderMessage.
-        NETunnelProviderManager.loadAllFromPreferences { managers, _ in
-            guard let session = managers?.first?.connection as? NETunnelProviderSession else { return }
-            let msg = "reloadBlocklist".data(using: .utf8)!
+        defaults.synchronize() // Flush to shared container file before signaling extension
+        // Signal the running tunnel to reload. Use cached manager if available for zero delay;
+        // fall back to loadAllFromPreferences on first call.
+        let msg = "reloadBlocklist".data(using: .utf8)!
+        if let session = tunnelManager?.connection as? NETunnelProviderSession {
             try? session.sendProviderMessage(msg, responseHandler: nil)
+        } else {
+            loadManager { [weak self] manager, _ in
+                self?.tunnelManager = manager
+                guard let session = manager?.connection as? NETunnelProviderSession else { return }
+                try? session.sendProviderMessage(msg, responseHandler: nil)
+            }
         }
         resolve(true)
     }
