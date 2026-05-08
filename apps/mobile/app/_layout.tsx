@@ -18,6 +18,17 @@ import { isSubscriptionExpired } from '../src/utils/subscription';
 import { vpnManager } from '../src/native/VPNManager';
 import { fetchBlocklist } from '../src/services/BlocklistService';
 
+// Fire blocklist fetch at module-load time on iOS — runs before any React rendering,
+// so the network request is already in-flight (or done) by the time useEffect fires.
+if (Platform.OS === 'ios') {
+  vpnManager.getVPNStatus().catch(() => {});
+  fetchBlocklist()
+    .then((domains) => {
+      if (domains.length > 0) vpnManager.updateBlocklist(domains).catch(() => {});
+    })
+    .catch(() => {});
+}
+
 // SecureStore-backed storage adapter so Supabase sessions persist across restarts
 const secureStoreAdapter: StorageAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
@@ -405,6 +416,7 @@ export default function RootLayout() {
   useEffect(() => {
     clearKeychainOnFreshInstall().finally(() => setReady(true));
 
+<<<<<<< HEAD
     // iOS: warm the VPN manager cache and refresh cloud blocklist on every launch.
     // getVPNStatus caches tunnelManager so updateBlocklist can send the provider
     // message without an extra async round-trip when the fetch resolves.
@@ -418,6 +430,8 @@ export default function RootLayout() {
         })
         .catch(() => {});
     }
+=======
+>>>>>>> 6f6562c09abde19d5242df3d381012c5c0cca5c0
   }, []);
 
   const api = useMemo(
