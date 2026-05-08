@@ -705,14 +705,16 @@ const actions: Record<string, ActionHandler> = {
     const priceId = PRICES[plan];
     if (!priceId) return errorResponse(`Unknown plan: ${plan}`, 400);
 
+    // Use localhost for development, production URL otherwise
+    const baseUrl = Deno.env.get("APP_URL") || "https://getascension.app";
+
     try {
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer_email: email,
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url:
-          "https://getascension.app/billing/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: "https://getascension.app/billing/cancel",
+        success_url: `${baseUrl}/onboarding/permissions?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/pricing`,
         metadata: { user_id },
       });
 

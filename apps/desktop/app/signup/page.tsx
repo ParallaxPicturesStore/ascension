@@ -4,14 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, syncPartnerLinks } from "@/lib/supabase";
+import { Input, Button, AuthLayout } from "@/components/ui";
+import { EyeIcon, EyeOffIcon } from "@/components/icons";
 
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -29,10 +34,7 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const { data, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    const { data, error: authError } = await supabase.auth.signUp({ email, password });
 
     if (authError) {
       setError(authError.message);
@@ -41,85 +43,163 @@ export default function SignupPage() {
     }
 
     if (data.session?.user?.id) {
-      try {
-        await syncPartnerLinks(data.session.user.id);
-      } catch (err) {
-        console.error("[Signup] Failed to sync partner links:", err);
-      }
+      try { await syncPartnerLinks(data.session.user.id); }
+      catch (err) { console.error("[Signup] syncPartnerLinks failed:", err); }
+      router.replace("/onboarding");
+      return;
     }
 
-    // New users should sign in first; dashboard auth check sends incomplete profiles into onboarding.
-    router.replace("/login");
+    // Email confirmation required — show inline confirmation instead of redirecting
+    setLoading(false);
+    setEmailSent(true);
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold tracking-[0.15em]">ASCENSION</h1>
-          <p className="text-sm text-muted mt-2">
-            Start your journey. Take back control.
-          </p>
-        </div>
+    <AuthLayout imageSrc="/login-bg.png">
+      <div className="flex-1 flex items-center justify-center px-lg py-2xl">
+        <div style={{ width: "100%", maxWidth: "var(--form-width)" }}>
 
-        <form onSubmit={handleSignup} className="space-y-4">
-          <div>
-            <label className="block text-sm text-muted mb-1.5">Email</label>
-            <input
+          {/* Heading */}
+          <div style={{ marginBottom: "var(--spacing-xl)" }}>
+            <h1
+              style={{
+                fontFamily: "var(--font-auth)",
+                fontSize: "var(--font-size-auth-heading)",
+                fontWeight: "var(--font-weight-auth-heading)",
+                lineHeight: "var(--line-height-auth-heading)",
+                color: "var(--color-foreground)",
+                margin: 0,
+              }}
+            >
+              Ascension
+            </h1>
+            <p
+              style={{
+                fontFamily: "var(--font-auth)",
+                fontSize: "var(--font-size-auth-body)",
+                fontWeight: "var(--font-weight-auth-body)",
+                lineHeight: "var(--line-height-auth-body)",
+                color: "var(--color-muted)",
+                marginTop: "var(--spacing-xs)",
+                marginBottom: 0,
+              }}
+            >
+              Start your journey. Take back control.
+            </p>
+          </div>
+
+          <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-base)" }}>
+            <Input
+              id="email"
               type="email"
+              label="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-card-bg border border-card-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent text-sm"
-              placeholder="you@email.com"
+              placeholder="Enter your email"
               required
             />
-          </div>
 
-          <div>
-            <label className="block text-sm text-muted mb-1.5">Password</label>
-            <input
-              type="password"
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              label="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-card-bg border border-card-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent text-sm"
-              placeholder="At least 8 characters"
+              placeholder="Enter your password"
               required
-              minLength={8}
+              rightIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="transition-opacity hover:opacity-70"
+                  style={{ color: "var(--color-muted)", lineHeight: 0 }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+                </button>
+              }
             />
-          </div>
 
-          <div>
-            <label className="block text-sm text-muted mb-1.5">
-              Confirm Password
-            </label>
-            <input
-              type="password"
+            <Input
+              id="confirm-password"
+              type={showConfirm ? "text" : "password"}
+              label="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-card-bg border border-card-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent text-sm"
               placeholder="Repeat your password"
               required
+              rightIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="transition-opacity hover:opacity-70"
+                  style={{ color: "var(--color-muted)", lineHeight: 0 }}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                >
+                  {showConfirm ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+                </button>
+              }
             />
-          </div>
 
-          {error && <p className="text-sm text-danger">{error}</p>}
+            {error && (
+              <p
+                role="alert"
+                style={{
+                  fontFamily: "var(--font-auth)",
+                  fontSize: "var(--font-size-auth-caption)",
+                  color: "var(--color-danger)",
+                  margin: 0,
+                }}
+              >
+                {error}
+              </p>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
+            {emailSent ? (
+              <p
+                style={{
+                  fontFamily: "var(--font-auth)",
+                  fontSize: "var(--font-size-auth-label)",
+                  color: "var(--color-success)",
+                  background: "var(--color-success-light)",
+                  border: "1px solid var(--color-success)",
+                  borderRadius: "var(--radius-card)",
+                  padding: "var(--spacing-md) var(--spacing-base)",
+                  margin: 0,
+                  textAlign: "center",
+                }}
+              >
+                A confirmation email has been sent to <strong>{email}</strong>.
+                Please verify your email then sign in.
+              </p>
+            ) : (
+              <Button type="submit" variant="primary" fullWidth loading={loading}>
+                Create account
+              </Button>
+            )}
+          </form>
+
+          <p
+            className="text-center"
+            style={{
+              fontFamily: "var(--font-auth)",
+              fontSize: "var(--font-size-auth-label)",
+              color: "var(--color-muted)",
+              marginTop: "var(--spacing-2xl)",
+            }}
           >
-            {loading ? "Creating account..." : "Create Account"}
-          </button>
-        </form>
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-semibold transition-opacity hover:opacity-70"
+              style={{ color: "var(--color-accent)" }}
+            >
+              Sign in
+            </Link>
+          </p>
 
-        <p className="text-center text-sm text-muted mt-6">
-          Already have an account?{" "}
-          <Link href="/login" className="text-accent hover:underline">
-            Sign in
-          </Link>
-        </p>
+        </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

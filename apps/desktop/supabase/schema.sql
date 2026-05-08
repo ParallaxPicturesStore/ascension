@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   subscription_status TEXT DEFAULT 'trial' CHECK (subscription_status IN ('trial', 'active', 'cancelled', 'expired')),
   goals TEXT,
   partner_password_hash TEXT,
+  subscription_lapse_date TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

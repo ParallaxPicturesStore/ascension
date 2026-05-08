@@ -1,26 +1,39 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase, syncPartnerLinks } from "@/lib/supabase";
+import { Input, Button, AuthLayout } from "@/components/ui";
+import { EyeIcon, EyeOffIcon, CheckIcon } from "@/components/icons";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const needsConfirm = searchParams.get("confirm") === "1";
+
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError]           = useState("");
+  const [loading, setLoading]       = useState(false);
+
+  // Derived — no extra state needed
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  // Skip login form if session already exists
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace("/");
+    });
+  }, [router]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
       setError(authError.message);
@@ -29,69 +42,164 @@ export default function LoginPage() {
     }
 
     if (data.user?.id) {
-      try {
-        await syncPartnerLinks(data.user.id);
-      } catch (err) {
-        console.error("[Login] Failed to sync partner links:", err);
-      }
+      try { await syncPartnerLinks(data.user.id); }
+      catch (err) { console.error("[Login] syncPartnerLinks failed:", err); }
     }
 
     router.push("/");
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold tracking-[0.15em]">ASCENSION</h1>
-          <p className="text-sm text-muted mt-2">Welcome back. Stay the course.</p>
-        </div>
+    <AuthLayout imageSrc="/login-bg.png">
+      {/* ── Form panel ── */}
+      <div className="flex-1 flex items-center justify-center px-lg py-2xl">
+        <div style={{ width: "100%", maxWidth: "var(--form-width)" }}>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm text-muted mb-1.5">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-card-bg border border-card-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent text-sm"
-              placeholder="you@email.com"
-              required
-            />
+          {/* Heading block */}
+          <div style={{ marginBottom: "var(--spacing-xl)" }}>
+            <h1
+              style={{
+                fontFamily: "var(--font-auth)",
+                fontSize: "var(--font-size-auth-heading)",
+                fontWeight: "var(--font-weight-auth-heading)",
+                lineHeight: "var(--line-height-auth-heading)",
+                color: "var(--color-foreground)",
+                margin: 0,
+              }}
+            >
+              Ascension
+            </h1>
+            <p
+              style={{
+                fontFamily: "var(--font-auth)",
+                fontSize: "var(--font-size-auth-body)",
+                fontWeight: "var(--font-weight-auth-body)",
+                lineHeight: "var(--line-height-auth-body)",
+                color: "var(--color-muted)",
+                marginTop: "var(--spacing-xs)",
+                marginBottom: 0,
+              }}
+            >
+              Welcome back. Stay the course.
+            </p>
           </div>
 
-          <div>
-            <label className="block text-sm text-muted mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-card-bg border border-card-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent text-sm"
-              placeholder="Enter your password"
-              required
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-danger">{error}</p>
+          {/* Email-confirmation notice */}
+          {needsConfirm && (
+            <div
+              style={{
+                background: "var(--color-accent-light)",
+                border: "1px solid var(--color-card-border)",
+                borderRadius: "var(--radius-card)",
+                color: "var(--color-accent)",
+                fontFamily: "var(--font-auth)",
+                fontSize: "var(--font-size-auth-label)",
+                padding: "var(--spacing-md) var(--spacing-base)",
+                marginBottom: "var(--spacing-lg)",
+                textAlign: "center",
+              }}
+            >
+              Check your email and click the confirmation link, then sign in below.
+            </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
-          >
-            {loading ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
+          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-base)" }}>
+            {/* Email */}
+            <Input
+              id="email"
+              type="email"
+              label="Email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="partner@ascension.app"
+              required
+              rightIcon={
+                emailValid
+                  ? <CheckIcon size={20} style={{ color: "var(--color-success)" }} />
+                  : null
+              }
+            />
 
-        <p className="text-center text-sm text-muted mt-6">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-accent hover:underline">
-            Sign up
-          </Link>
-        </p>
+            {/* Password */}
+            <div>
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                label="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••"
+                required
+                rightIcon={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="transition-opacity hover:opacity-70"
+                    style={{ color: "var(--color-muted)", lineHeight: 0 }}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+                  </button>
+                }
+              />
+              {/* Forgot password */}
+              <div className="flex justify-end" style={{ marginTop: "var(--spacing-xs)" }}>
+                <Link
+                  href="/forgot-password"
+                  className="transition-opacity hover:opacity-70"
+                  style={{
+                    fontFamily: "var(--font-auth)",
+                    fontSize: "var(--font-size-auth-label)",
+                    color: "var(--color-accent)",
+                  }}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            </div>
+
+            {/* Auth error */}
+            {error && (
+              <p
+                role="alert"
+                style={{
+                  fontFamily: "var(--font-auth)",
+                  fontSize: "var(--font-size-auth-caption)",
+                  color: "var(--color-danger)",
+                  margin: 0,
+                }}
+              >
+                {error}
+              </p>
+            )}
+
+            <Button type="submit" variant="primary" fullWidth loading={loading}>
+              Sign in
+            </Button>
+          </form>
+
+          {/* Sign-up link */}
+          <p
+            className="text-center"
+            style={{
+              fontFamily: "var(--font-auth)",
+              fontSize: "var(--font-size-auth-label)",
+              color: "var(--color-muted)",
+              marginTop: "var(--spacing-2xl)",
+            }}
+          >
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/signup"
+              className="font-semibold transition-opacity hover:opacity-70"
+              style={{ color: "var(--color-accent)" }}
+            >
+              Sign up
+            </Link>
+          </p>
+
+        </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

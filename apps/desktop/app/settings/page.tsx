@@ -4,16 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { linkPartner, supabase } from "@/lib/supabase";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
-import {
-  ArrowLeft,
-  User,
-  Shield,
-  CreditCard,
-  Bell,
-  Monitor,
-  Lock,
-  LogOut,
-} from "lucide-react";
+import { User } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -231,191 +222,404 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <button
-        onClick={() => router.push("/")}
-        className="flex items-center gap-1 text-sm text-muted hover:text-foreground mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back
-      </button>
-
-      <h1 className="text-xl font-bold mb-6">Settings</h1>
-
-      {/* Profile section */}
-      <div className="space-y-4">
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <User className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold">Profile</h2>
+    <div className="min-h-screen relative overflow-hidden" style={{ backgroundColor: '#FFFFFF' }}>
+      {/* Header - Floating navbar matching Dashboard */}
+      <div style={{
+        position: 'absolute',
+        top: '24px',
+        left: '36px',
+        right: '36px',
+        height: '63px',
+        backgroundColor: 'white',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '100px',
+        padding: '0 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        border: '1px solid rgba(217, 221, 229, 0.3)',
+        zIndex: 100
+      }}>
+        <div className="flex items-center" style={{ gap: 'var(--spacing-md)' }}>
+          <div className="rounded-full bg-primary flex items-center justify-center" style={{ 
+            width: '40px', 
+            height: '40px' 
+          }}>
+            <span className="text-white font-semibold" style={{ 
+              fontSize: 'var(--font-size-caption)',
+              fontFamily: 'var(--font-auth)'
+            }}>
+              A
+            </span>
           </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-muted mb-1">Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-background border border-card-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-accent"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1">Email</label>
-              <input
-                type="email"
-                value={profile?.email || ""}
-                disabled
-                className="w-full bg-background/50 border border-card-border rounded-lg px-3 py-2.5 text-sm text-muted"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1">Your Goal</label>
-              <textarea
-                value={goals}
-                onChange={(e) => setGoals(e.target.value)}
-                className="w-full bg-background border border-card-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-accent resize-none"
-                rows={3}
-              />
-            </div>
-          </div>
+          <span style={{ 
+            fontSize: 'var(--font-size-body)', 
+            fontWeight: 'var(--font-weight-medium)',
+            color: 'var(--color-foreground)',
+            fontFamily: 'var(--font-auth)'
+          }}>
+            Ascension ally
+          </span>
+        </div>
+        
+        <div className="flex items-center" style={{ 
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          gap: 'var(--spacing-xl)'
+        }}>
+          <button
+            onClick={() => router.push("/")}
+            className="transition-colors"
+            style={{ 
+              fontSize: 'var(--font-size-caption)',
+              fontWeight: 'var(--font-weight-medium)',
+              color: 'var(--color-muted)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 'var(--spacing-sm) 0',
+              fontFamily: 'var(--font-auth)'
+            }}
+          >
+            Dashboard
+          </button>
+          <button style={{ 
+            fontSize: 'var(--font-size-caption)',
+            fontWeight: 'var(--font-weight-medium)',
+            color: 'var(--color-accent)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 'var(--spacing-sm) 0',
+            fontFamily: 'var(--font-auth)'
+          }}>
+            Settings
+          </button>
         </div>
 
-        {/* Partner section */}
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold">Accountability Partner</h2>
-          </div>
-          <div>
-            <label className="block text-xs text-muted mb-1">
-              Partner&apos;s Email
-            </label>
-            <input
-              type="email"
-              value={partnerEmail}
-              onChange={(e) => setPartnerEmail(e.target.value)}
-              className="w-full bg-background border border-card-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-accent"
-              placeholder="partner@email.com"
-            />
-          </div>
-        </div>
-
-        {/* Monitoring section */}
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Monitor className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold">Monitoring</h2>
-          </div>
-          <div className="space-y-2 text-sm text-muted">
-            <div className="flex justify-between">
-              <span>Screen monitoring</span>
-              <span className="text-foreground">Continuous</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Flag threshold</span>
-              <span className="text-foreground">70% confidence</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Immediate alert</span>
-              <span className="text-foreground">90% confidence</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Subscription section */}
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <CreditCard className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold">Subscription</h2>
-          </div>
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-sm capitalize">
-                {effectiveSubscriptionStatus || "trial"}
-              </div>
-              <div className="text-xs text-muted">Current plan</div>
-            </div>
-            <button
-              onClick={handleSubscriptionAction}
-              className="text-xs text-accent hover:underline"
-            >
-              {effectiveSubscriptionStatus === "trial" ? "Upgrade" : "Manage"}
-            </button>
-          </div>
-        </div>
-
-        {/* Notifications */}
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Bell className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-semibold">Notifications</h2>
-          </div>
-          <div className="space-y-2 text-sm text-muted">
-            <div className="flex justify-between">
-              <span>Content flag alerts</span>
-              <span className="text-success">On</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Evasion alerts</span>
-              <span className="text-success">On</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Weekly summary</span>
-              <span className="text-success">On</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Save button */}
-        <button
-          onClick={saveProfile}
-          disabled={saving}
-          className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
-        >
-          {saving ? "Saving..." : "Save Changes"}
+        <button className="rounded-full bg-primary flex items-center justify-center" style={{ 
+          width: '40px', 
+          height: '40px',
+          border: 'none',
+          cursor: 'pointer'
+        }}>
+          <User className="text-white" style={{ width: '20px', height: '20px' }} />
         </button>
+      </div>
 
-        {/* Quit section */}
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <LogOut className="w-4 h-4 text-danger" />
-            <h2 className="text-sm font-semibold">Quit Ascension</h2>
+      {/* Content */}
+      <div style={{ 
+        maxWidth: '720px', 
+        margin: '0 auto', 
+        padding: '110px var(--spacing-2xl) var(--spacing-2xl)',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        <h1 style={{ 
+          fontSize: 'var(--font-size-h1)',
+          fontWeight: 'var(--font-weight-bold)',
+          color: 'var(--color-foreground)',
+          marginBottom: 'var(--spacing-3xl)'
+        }}>
+          Settings
+        </h1>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2xl)' }}>
+          {/* Profile section */}
+          <div>
+            <h2 style={{ 
+              fontSize: 'var(--font-size-h3)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-foreground)',
+              marginBottom: 'var(--spacing-lg)'
+            }}>
+              Profile
+            </h2>
+            <div style={{ 
+              backgroundColor: 'var(--color-surface)', 
+              borderRadius: 'var(--radius-card)', 
+              padding: '0',
+              border: '1px solid var(--color-card-border)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ 
+                padding: '16px 12px 8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                borderBottom: '1px solid var(--color-border)'
+              }}>
+                <span style={{ 
+                  fontSize: 'var(--font-size-caption)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-muted)'
+                }}>
+                  Email
+                </span>
+                <span style={{ 
+                  fontSize: 'var(--font-size-caption)',
+                  color: 'var(--color-foreground)'
+                }}>
+                  {profile?.email || "test@ascension.app"}
+                </span>
+              </div>
+              <div style={{ 
+                padding: '16px 12px 8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <span style={{ 
+                  fontSize: 'var(--font-size-caption)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-muted)'
+                }}>
+                  Name
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                  <span style={{ 
+                    fontSize: 'var(--font-size-caption)',
+                    color: 'var(--color-foreground)'
+                  }}>
+                    {name || "Jamie Test"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const newName = prompt("Enter new name:", name);
+                      if (newName) {
+                        setName(newName);
+                        saveProfile();
+                      }
+                    }}
+                    style={{ 
+                      fontSize: 'var(--font-size-caption)',
+                      fontWeight: 'var(--font-weight-medium)',
+                      color: 'var(--color-accent)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-muted mb-3">
-            Enter your quit password to close the app. Your partner will be
-            notified.
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={quitPassword}
-              onChange={(e) => {
-                setQuitPassword(e.target.value);
-                setQuitError("");
-              }}
-              className="flex-1 bg-background border border-card-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-danger"
-              placeholder="Enter quit password"
-            />
+
+          {/* Accountability partner section */}
+          <div>
+            <h2 style={{ 
+              fontSize: 'var(--font-size-h3)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-foreground)',
+              marginBottom: 'var(--spacing-lg)'
+            }}>
+              Accountability partner
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-tl)' }}>
+              <div style={{ 
+                backgroundColor: 'var(--color-surface)', 
+                borderRadius: 'var(--radius-card)', 
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '20px',
+                border: '1px solid var(--color-card-border)'
+              }}>
+                <span style={{ 
+                  fontSize: 'var(--font-size-caption)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-muted)',
+                  whiteSpace: 'nowrap'
+                }}>
+                  Partner email
+                </span>
+                <input
+                  type="email"
+                  value={partnerEmail}
+                  onChange={(e) => setPartnerEmail(e.target.value)}
+                  style={{
+                    fontSize: 'var(--font-size-caption)',
+                    color: 'var(--color-foreground)',
+                    textAlign: 'right',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    flex: 1,
+                    minWidth: 0,
+                    fontFamily: 'var(--font-auth)'
+                  }}
+                  placeholder="partner@email.com"
+                />
+              </div>
+              <button
+                onClick={saveProfile}
+                disabled={saving}
+                style={{ 
+                  width: '100%',
+                  height: '52px',
+                  padding: '0 var(--spacing-2xl)',
+                  borderRadius: 'var(--radius-button)',
+                  border: '1px solid var(--color-accent)',
+                  color: 'var(--color-accent)',
+                  backgroundColor: 'transparent',
+                  fontWeight: 'var(--font-weight-medium)',
+                  fontSize: 'var(--font-size-body)',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.5 : 1,
+                  transition: 'background-color 0.2s',
+                  fontFamily: 'var(--font-auth)'
+                }}
+                onMouseEnter={(e) => !saving && (e.currentTarget.style.backgroundColor = 'var(--color-accent-light)')}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {saving ? "Updating..." : "Update partner"}
+              </button>
+            </div>
+          </div>
+
+          {/* Subscription section */}
+          <div>
+            <h2 style={{ 
+              fontSize: 'var(--font-size-h3)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-foreground)',
+              marginBottom: 'var(--spacing-lg)'
+            }}>
+              Subscription
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-tl)' }}>
+              <div style={{ 
+                backgroundColor: 'var(--color-surface)', 
+                borderRadius: 'var(--radius-card)', 
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '20px',
+                border: '1px solid var(--color-card-border)'
+              }}>
+                <span style={{ 
+                  fontSize: 'var(--font-size-caption)',
+                  fontWeight: 'var(--font-weight-medium)',
+                  color: 'var(--color-muted)'
+                }}>
+                  Status
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                  <span style={{ 
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    backgroundColor: 'var(--color-warning)',
+                    flexShrink: 0
+                  }} />
+                  <span style={{ 
+                    fontSize: 'var(--font-size-caption)',
+                    color: 'var(--color-foreground)',
+                    textTransform: 'capitalize'
+                  }}>
+                    {effectiveSubscriptionStatus || "Trial"}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleSubscriptionAction}
+                style={{ 
+                  width: '100%',
+                  height: '52px',
+                  padding: '0 var(--spacing-2xl)',
+                  borderRadius: 'var(--radius-button)',
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-on-primary)',
+                  border: 'none',
+                  fontWeight: 'var(--font-weight-semibold)',
+                  fontSize: 'var(--font-size-body)',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  fontFamily: 'var(--font-auth)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
+              >
+                View plans
+              </button>
+            </div>
+          </div>
+
+          {/* Notifications section */}
+          <div>
+            <h2 style={{ 
+              fontSize: 'var(--font-size-h3)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-foreground)',
+              marginBottom: 'var(--spacing-lg)'
+            }}>
+              Notifications
+            </h2>
+            <div style={{ 
+              backgroundColor: 'var(--color-surface)', 
+              borderRadius: 'var(--radius-card)', 
+              padding: '16px',
+              border: '1px solid var(--color-card-border)'
+            }}>
+              <p style={{ 
+                fontSize: 'var(--font-size-caption)',
+                lineHeight: 'var(--line-height-body)',
+                color: 'var(--color-muted)',
+                margin: 0
+              }}>
+                Push notifications are used to alert you about streak milestones, partner encouragements, and account updates.
+              </p>
+            </div>
+          </div>
+
+          {/* Logout section */}
+          <div>
+            <h2 style={{ 
+              fontSize: 'var(--font-size-h3)',
+              fontWeight: 'var(--font-weight-semibold)',
+              color: 'var(--color-foreground)',
+              marginBottom: 'var(--spacing-lg)'
+            }}>
+              Account
+            </h2>
             <button
               onClick={async () => {
-                setQuitting(true);
-                setQuitError("");
-                if (typeof window !== "undefined" && window.ascension) {
-                  const result = await window.ascension.quitApp(quitPassword);
-                  if (!result.success) {
-                    setQuitError(result.error || "Incorrect password");
-                  }
+                if (typeof window !== "undefined" && (window as any).ascension?.notifyLoggedOut) {
+                  await (window as any).ascension.notifyLoggedOut();
                 }
-                setQuitting(false);
+                await supabase.auth.signOut();
+                router.push("/login");
               }}
-              disabled={quitting || !quitPassword}
-              className="bg-danger/10 hover:bg-danger/20 disabled:opacity-50 text-danger font-medium px-4 py-2 rounded-lg text-sm transition-colors"
+              style={{ 
+                width: '100%',
+                height: '52px',
+                padding: '0 var(--spacing-2xl)',
+                borderRadius: 'var(--radius-button)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-danger)',
+                border: '1px solid var(--color-danger)',
+                fontWeight: 'var(--font-weight-medium)',
+                fontSize: 'var(--font-size-body)',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                fontFamily: 'var(--font-auth)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-danger-light)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              {quitting ? "..." : "Quit"}
+              Log out
             </button>
           </div>
-          {quitError && <p className="text-xs text-danger mt-2">{quitError}</p>}
         </div>
       </div>
     </div>

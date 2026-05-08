@@ -1,40 +1,190 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════
+   Design tokens — SINGLE SOURCE OF TRUTH
+   All values are kept in sync with packages/ui/src/theme.ts
+   If you change theme.ts, update the matching token here too.
+═══════════════════════════════════════════════════════════════ */
 :root {
-  --background: #faf9f7;
-  --foreground: #1a1a1a;
-  --card-bg: #ffffff;
-  --card-border: #e8e5e0;
-  --accent: #1a3a5c;
-  --accent-hover: #142e4a;
-  --accent-light: #edf3f8;
-  --muted: #6b6560;
-  --warm-bg: #f3f1ed;
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
+  /* ── Colors (theme.colors) ─────────────────────────────────── */
+  --color-primary:        #223D8C;
+  --color-primary-hover:  #273E88;
+  --color-secondary:      #111111;
+  --color-accent:         #314A9F;
+  --color-accent-hover:   #273E88;
+  --color-accent-light:   #EEF2FF;
+  --color-background:     #FCFCFD;
+  --color-surface:        #FFFFFF;
+  --color-card-bg:        #FFFFFF;
+  --color-foreground:     #111111;
+  --color-text-primary:   #111111;
+  --color-text-secondary: #5F636E;
+  --color-muted:          #4D4D4D;
+  --color-border:         #D9DDE5;
+  --color-card-border:    #D9DDE5;
+  --color-warm-bg:        #F6F7FB;
+  --color-success:        #16A34A;
+  --color-success-light:  #F0FDF4;
+  --color-warning:        #D97706;
+  --color-warning-light:  #FFF7ED;
+  --color-danger:         #DC2626;
+  --color-danger-light:   #FEF2F2;
+  --color-on-accent:      #FFFFFF;
+  --color-on-primary:     #FFFFFF;
+  --color-badge:          #AEC3FF;
+  --color-info-border:    #D8E1FF;
+  --color-settings-bg:    #F8FAFF;
+  --color-background-card:#F0F4FF;
+
+  /* ── Typography (theme.typography + theme.fontFamily) ─────── */
+  --font-auth:   var(--font-afacad), "Afacad Flux", system-ui, sans-serif;
+  --font-sans:   var(--font-nunito), "Nunito", system-ui, sans-serif;
+
+  /* ── Font sizes (theme.fontSize — px → rem) ───────────────── */
+  --font-size-caption:  1.125rem;   /* 18px */
+  --font-size-body:     1rem;       /* 16px */
+  --font-size-body-lg:  1.125rem;   /* 18px */
+  --font-size-button:   1.125rem;   /* 18px */
+  --font-size-h3:       1.25rem;    /* 20px */
+  --font-size-h2:       1.75rem;    /* 28px */
+  --font-size-h1:       2.25rem;    /* 36px */
+  --font-size-display:  4rem;       /* 64px */
+
+  /* Auth-page aliases (same values, semantic names) */
+  --font-size-auth-heading: var(--font-size-h1);    /* 36px */
+  --font-size-auth-body:    var(--font-size-body-lg); /* 18px */
+  --font-size-auth-label:   var(--font-size-body);  /* 16px */
+  --font-size-auth-caption: var(--font-size-caption); /* 18px */
+
+  /* ── Line heights (theme.lineHeight) ──────────────────────── */
+  --line-height-caption:  1.125rem;  /* 18px */
+  --line-height-body:     1.5rem;    /* 24px */
+  --line-height-body-lg:  1.75rem;   /* 28px */
+  --line-height-h3:       1.625rem;  /* 26px */
+  --line-height-h2:       2.125rem;  /* 34px */
+  --line-height-h1:       2.6875rem; /* 43px */
+
+  --line-height-auth-heading: var(--line-height-h1);
+  --line-height-auth-body:    var(--line-height-body-lg);
+  --line-height-auth-label:   var(--line-height-body);
+
+  /* ── Font weights (theme.fontWeight) ──────────────────────── */
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+
+  --font-weight-auth-heading: var(--font-weight-medium);   /* 500 */
+  --font-weight-auth-body:    var(--font-weight-regular);  /* 400 */
+  --font-weight-auth-label:   var(--font-weight-regular);  /* 400 */
+
+  /* ── Spacing (theme.spacing — px → rem) ───────────────────── */
+  --spacing-xs:   0.25rem;   /* 4px  */
+  --spacing-sm:   0.5rem;    /* 8px  */
+  --spacing-md:   0.75rem;   /* 12px */
+  --spacing-base: 1rem;      /* 16px */
+  --spacing-tl:   1.25rem;   /* 20px */
+  --spacing-lg:   1.5rem;    /* 24px */
+  --spacing-xl:   2rem;      /* 32px */
+  --spacing-2xl:  3rem;      /* 48px */
+  --spacing-3xl:  4rem;      /* 64px */
+
+  /* ── Border radii (theme.borderRadius — px → rem) ─────────── */
+  --radius-sm:     0.75rem;  /* 12px */
+  --radius-md:     1.125rem; /* 18px */
+  --radius-lg:     1.5rem;   /* 24px */
+  --radius-xl:     2rem;     /* 32px */
+  --radius-card:   1.5rem;   /* 24px  — theme.borderRadius.card */
+  --radius-button: 9999px;   /* pill  — theme.borderRadius.button = 999 */
+  --radius-pill:   9999px;
+  --radius-circle: 9999px;
+
+  /* ── Component sizes (theme.components) ───────────────────── */
+  --input-height:  3.625rem; /* 58px  — theme.components.input.height */
+  --button-height: 3.625rem; /* 58px  — theme.components.button.height */
+  --input-radius:  9999px;   /* pill inputs */
+  --input-border:  1px;
+  --input-px:      1rem;     /* 16px padding */
+
+  /* ── Form container width ──────────────────────────────────── */
+  --form-width: 26.25rem;    /* 420px */
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Tailwind v4 @theme — registers tokens as utility classes
+   e.g. text-h1, bg-primary, p-lg, rounded-card …
+═══════════════════════════════════════════════════════════════ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card-bg: var(--card-bg);
-  --color-card-border: var(--card-border);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-light: var(--accent-light);
-  --color-muted: var(--muted);
-  --color-warm-bg: var(--warm-bg);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --font-sans: var(--font-nunito);
+  /* Colors */
+  --color-background:      var(--color-background);
+  --color-foreground:      var(--color-foreground);
+  --color-primary:         var(--color-primary);
+  --color-primary-hover:   var(--color-primary-hover);
+  --color-primaryHover:    var(--color-primary-hover);
+  --color-accent:          var(--color-accent);
+  --color-accent-hover:    var(--color-accent-hover);
+  --color-accent-light:    var(--color-accent-light);
+  --color-surface:         var(--color-surface);
+  --color-card-bg:         var(--color-card-bg);
+  --color-card-border:     var(--color-card-border);
+  --color-border:          var(--color-border);
+  --color-muted:           var(--color-muted);
+  --color-text-primary:    var(--color-text-primary);
+  --color-text-secondary:  var(--color-text-secondary);
+  --color-warm-bg:         var(--color-warm-bg);
+  --color-success:         var(--color-success);
+  --color-success-light:   var(--color-success-light);
+  --color-warning:         var(--color-warning);
+  --color-warning-light:   var(--color-warning-light);
+  --color-danger:          var(--color-danger);
+  --color-danger-light:    var(--color-danger-light);
+  --color-on-accent:       var(--color-on-accent);
+  --color-badge:           var(--color-badge);
+  --color-badgeColor:      var(--color-badge);
+  --color-settings-bg:     var(--color-settings-bg);
+  --color-background-card: var(--color-background-card);
+
+  /* Font family */
+  --font-sans: var(--font-sans);
+
+  /* Font sizes */
+  --text-caption:  var(--font-size-caption);
+  --text-body:     var(--font-size-body);
+  --text-body-lg:  var(--font-size-body-lg);
+  --text-h3:       var(--font-size-h3);
+  --text-h2:       var(--font-size-h2);
+  --text-h1:       var(--font-size-h1);
+  --text-display:  var(--font-size-display);
+
+  /* Spacing */
+  --spacing-xs:   var(--spacing-xs);
+  --spacing-sm:   var(--spacing-sm);
+  --spacing-md:   var(--spacing-md);
+  --spacing-base: var(--spacing-base);
+  --spacing-lg:   var(--spacing-lg);
+  --spacing-xl:   var(--spacing-xl);
+  --spacing-2xl:  var(--spacing-2xl);
+  --spacing-3xl:  var(--spacing-3xl);
+
+  /* Border radii */
+  --radius-sm:     var(--radius-sm);
+  --radius-md:     var(--radius-md);
+  --radius-lg:     var(--radius-lg);
+  --radius-xl:     var(--radius-xl);
+  --radius-card:   var(--radius-card);
+  --radius-button: var(--radius-button);
+  --radius-pill:   var(--radius-pill);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Base styles
+═══════════════════════════════════════════════════════════════ */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-auth);   /* Afacad Flux everywhere — matches mobile */
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
   overflow-x: hidden;
 }
 

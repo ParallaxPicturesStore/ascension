@@ -142,12 +142,14 @@ function createWindow() {
   crashLog("Creating BrowserWindow...");
 
   mainWindow = new BrowserWindow({
-    width: 440,
-    height: 720,
+    width: 1024,
+    height: 680,
+    minWidth: 1024,
+    minHeight: 680,
     show: false,
-    resizable: false,
+    resizable: true,
     title: "Ascension",
-    backgroundColor: "#faf9f7",
+    backgroundColor: "#ffffff",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
