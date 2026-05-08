@@ -27,20 +27,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         // extension was not running is picked up immediately.
         blocklist.reloadCloudBlocklist()
 
-        // Listen for the main app signaling a fresh blocklist was written to App Group.
-        CFNotificationCenterAddObserver(
-            CFNotificationCenterGetDarwinNotifyCenter(),
-            Unmanaged.passUnretained(self).toOpaque(),
-            { _, observer, _, _, _ in
-                guard let observer = observer else { return }
-                let provider = Unmanaged<PacketTunnelProvider>.fromOpaque(observer).takeUnretainedValue()
-                provider.blocklist.reloadCloudBlocklist()
-            },
-            "app.getascension.blocklistUpdated" as CFString,
-            nil,
-            .deliverImmediately
-        )
-
         let settings = createTunnelSettings()
         setTunnelNetworkSettings(settings) { [weak self] error in
             if let error = error {
@@ -56,13 +42,15 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
+    override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+        if let message = String(data: messageData, encoding: .utf8), message == "reloadBlocklist" {
+            blocklist.reloadCloudBlocklist()
+            os_log("Blocklist reloaded via app message", log: log, type: .info)
+        }
+        completionHandler?(nil)
+    }
+
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        CFNotificationCenterRemoveObserver(
-            CFNotificationCenterGetDarwinNotifyCenter(),
-            Unmanaged.passUnretained(self).toOpaque(),
-            CFNotificationName("app.getascension.blocklistUpdated" as CFString),
-            nil
-        )
         heartbeatTimer?.cancel()
         heartbeatTimer = nil
         os_log("Stopping Ascension DNS filter tunnel (reason: %d)", log: log, type: .info, reason.rawValue)
@@ -531,7 +519,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let timer = DispatchSource.makeTimerSource(queue: reportQueue)
         // Fire immediately, then repeat every 2 minutes
         timer.schedule(deadline: .now(), repeating: heartbeatInterval)
-        timer.setEventHandler { [weak self] in self?.sendHeartbeat() }
+        timer.setEventHandler { [weak self] in
+            self?.blocklist.reloadCloudBlocklist()
+            self?.sendHeartbeat()
+        }
         timer.resume()
         heartbeatTimer = timer
         os_log("Heartbeat timer started (interval=%.0fs)", log: log, type: .info, heartbeatInterval)

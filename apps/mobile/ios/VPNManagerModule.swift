@@ -87,12 +87,12 @@ class VPNManagerModule: NSObject {
             return
         }
         defaults.set(domains, forKey: "cloudBlocklist")
-        // Signal the VPN extension (separate process) to reload from UserDefaults immediately.
-        CFNotificationCenterPostNotification(
-            CFNotificationCenterGetDarwinNotifyCenter(),
-            CFNotificationName("app.getascension.blocklistUpdated" as CFString),
-            nil, nil, true
-        )
+        // Tell the running tunnel to reload immediately via sendProviderMessage.
+        NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+            guard let session = managers?.first?.connection as? NETunnelProviderSession else { return }
+            let msg = "reloadBlocklist".data(using: .utf8)!
+            try? session.sendProviderMessage(msg, responseHandler: nil)
+        }
         resolve(true)
     }
 
