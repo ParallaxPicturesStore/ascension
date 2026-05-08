@@ -242,12 +242,7 @@ function AuthGate() {
 
           if (incomplete && !inOnboarding) {
             router.replace('/onboarding');
-          } else if (!incomplete && !expired && !monitoringSetupDone && !monitoringSetupDeferred && !inSystemSetup) {
-            router.replace('/system-setup');
-          } else if (
-            !incomplete
-            && (inAuthGroup || inOnboarding)
-          ) {
+          } else if (!incomplete && (inAuthGroup || inOnboarding)) {
             router.replace('/');
           }
         })
@@ -416,7 +411,6 @@ export default function RootLayout() {
   useEffect(() => {
     clearKeychainOnFreshInstall().finally(() => setReady(true));
 
-<<<<<<< HEAD
     // iOS: warm the VPN manager cache and refresh cloud blocklist on every launch.
     // getVPNStatus caches tunnelManager so updateBlocklist can send the provider
     // message without an extra async round-trip when the fetch resolves.
@@ -430,8 +424,6 @@ export default function RootLayout() {
         })
         .catch(() => {});
     }
-=======
->>>>>>> 6f6562c09abde19d5242df3d381012c5c0cca5c0
   }, []);
 
   const api = useMemo(
