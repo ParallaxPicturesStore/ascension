@@ -191,6 +191,17 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
+  // Enable DevTools toggle with F12
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12" && input.type === "keyDown") {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools({ mode: "detach" });
+      }
+    }
+  });
+
   // SECURITY: Prevent navigation to untrusted origins
   mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
     const allowed = ["http://localhost:3001", "http://127.0.0.1:", "file://", "app://"];

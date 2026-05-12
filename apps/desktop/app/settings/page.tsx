@@ -28,6 +28,8 @@ export default function SettingsPage() {
   const [quitPassword, setQuitPassword] = useState("");
   const [quitError, setQuitError] = useState("");
   const [quitting, setQuitting] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [tempName, setTempName] = useState("");
   const effectiveSubscriptionStatus = getEffectiveSubscriptionStatus(
     profile?.subscription_status || "trial",
     profile?.subscription_lapse_date || null,
@@ -154,6 +156,7 @@ export default function SettingsPage() {
         console.error("[Settings] Failed to link partner:", err);
       }
 
+      // Update profile state with new values
       setProfile((current) =>
         current
           ? {
@@ -164,6 +167,8 @@ export default function SettingsPage() {
             }
           : current,
       );
+    } else {
+      console.error("[Settings] Failed to update profile:", updateError);
     }
 
     setSaving(false);
@@ -379,36 +384,135 @@ export default function SettingsPage() {
                 }}>
                   Name
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-                  <span style={{ 
-                    fontSize: 'var(--font-size-caption)',
-                    color: 'var(--color-foreground)'
-                  }}>
-                    {name || "Jamie Test"}
-                  </span>
-                  <button
-                    onClick={() => {
-                      const newName = prompt("Enter new name:", name);
-                      if (newName) {
-                        setName(newName);
-                        saveProfile();
-                      }
-                    }}
-                    style={{ 
+                {editingName ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flex: 1, justifyContent: 'flex-end' }}>
+                    <input
+                      type="text"
+                      value={tempName}
+                      onChange={(e) => setTempName(e.target.value)}
+                      autoFocus
+                      style={{
+                        fontSize: 'var(--font-size-caption)',
+                        color: 'var(--color-foreground)',
+                        backgroundColor: 'var(--color-surface)',
+                        border: '1px solid var(--color-accent)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '4px 8px',
+                        outline: 'none',
+                        fontFamily: 'var(--font-auth)',
+                        minWidth: '150px'
+                      }}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && tempName.trim()) {
+                          setSaving(true);
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (session && profile) {
+                            const { error } = await supabase
+                              .from("users")
+                              .update({ name: tempName.trim() })
+                              .eq("id", profile.id);
+                            
+                            if (!error) {
+                              setName(tempName.trim());
+                              setProfile({ ...profile, name: tempName.trim() });
+                              setEditingName(false);
+                            } else {
+                              console.error("[Settings] Failed to update name:", error);
+                              alert(`Failed to update name: ${error.message}`);
+                            }
+                          }
+                          setSaving(false);
+                        } else if (e.key === 'Escape') {
+                          setEditingName(false);
+                          setTempName(name);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={async () => {
+                        if (tempName.trim()) {
+                          setSaving(true);
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (session && profile) {
+                            const { error } = await supabase
+                              .from("users")
+                              .update({ name: tempName.trim() })
+                              .eq("id", profile.id);
+                            
+                            if (!error) {
+                              setName(tempName.trim());
+                              setProfile({ ...profile, name: tempName.trim() });
+                              setEditingName(false);
+                            } else {
+                              console.error("[Settings] Failed to update name:", error);
+                              alert(`Failed to update name: ${error.message}`);
+                            }
+                          }
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving || !tempName.trim()}
+                      style={{ 
+                        fontSize: 'var(--font-size-caption)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        color: 'white',
+                        backgroundColor: 'var(--color-accent)',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '4px 12px',
+                        cursor: saving || !tempName.trim() ? 'not-allowed' : 'pointer',
+                        opacity: saving || !tempName.trim() ? 0.5 : 1
+                      }}
+                    >
+                      {saving ? "..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingName(false);
+                        setTempName(name);
+                      }}
+                      disabled={saving}
+                      style={{ 
+                        fontSize: 'var(--font-size-caption)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        color: 'var(--color-muted)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: saving ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                    <span style={{ 
                       fontSize: 'var(--font-size-caption)',
-                      fontWeight: 'var(--font-weight-medium)',
-                      color: 'var(--color-accent)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      textDecoration: 'none'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
-                  >
-                    Edit
-                  </button>
-                </div>
+                      color: 'var(--color-foreground)'
+                    }}>
+                      {name || "Jamie Test"}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setTempName(name);
+                        setEditingName(true);
+                      }}
+                      style={{ 
+                        fontSize: 'var(--font-size-caption)',
+                        fontWeight: 'var(--font-weight-medium)',
+                        color: 'var(--color-accent)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textDecoration: 'none'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                      onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

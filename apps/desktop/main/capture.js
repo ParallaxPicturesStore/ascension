@@ -187,25 +187,17 @@ async function captureAndAnalyze() {
     const user = await getCurrentUser();
     const token = getAccessToken();
 
-    // Upload every capture (blurred) so storage is complete for both clean and flagged events.
+    // Only upload and store flagged screenshots (NSFW detected)
     let screenshotUrl = null;
     let blurredBuffer = null;
-    if (user) {
+    
+    if (flagged && user) {
       blurredBuffer = await blurScreenshot(imgBuffer);
       screenshotUrl = await uploadScreenshotToStorage(user.id, timestamp, blurredBuffer);
       if (screenshotUrl) {
-        console.log(`[Capture] Upload success for capture ${id}`);
+        console.log(`[Capture] Upload success for flagged capture ${id}`);
       } else {
-        console.warn(`[Capture] Upload failed for capture ${id}`);
-      }
-    } else {
-      if (!currentUserId) {
-        if (!waitingForUserLogged) {
-          console.log("[Capture] Waiting for authenticated user before uploading captures");
-          waitingForUserLogged = true;
-        }
-      } else {
-        console.warn(`[Capture] Skipping upload for capture ${id} - no current user profile`);
+        console.warn(`[Capture] Upload failed for flagged capture ${id}`);
       }
     }
 
@@ -221,7 +213,7 @@ async function captureAndAnalyze() {
       const blurredPath = path.join(tempDir, `${id}-blurred.jpg`);
       fs.writeFileSync(blurredPath, blurredBuffer);
 
-      // Log screenshot with URL
+      // Log flagged screenshot with URL
       if (user && token) {
         await callEdgeFunction("screenshots.log", {
           user_id: user.id,
@@ -279,20 +271,7 @@ async function captureAndAnalyze() {
     } else {
       console.log(`[Capture] Clean - Confidence: ${maxConfidence}%`);
 
-      // Log clean screenshot with URL
-      if (user && token) {
-        await callEdgeFunction("screenshots.log", {
-          user_id: user.id,
-          timestamp,
-          rekognition_score: maxConfidence,
-          flagged: false,
-          labels: [],
-          ...(screenshotUrl && { screenshot_url: screenshotUrl }),
-        }, token)
-          .then(() => console.log(`[Capture] screenshots.log success (clean) for capture ${id}`))
-          .catch((err) => console.error("[Capture] Failed to log screenshot:", err.message));
-      }
-
+      // Don't log clean screenshots to database - only flagged ones are stored
       if (mainWindowRef) {
         mainWindowRef.webContents.send("capture:event", {
           type: "clean",
